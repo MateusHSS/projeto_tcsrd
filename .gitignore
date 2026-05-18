@@ -1,0 +1,12 @@
+.venv/
+env/
+__pycache__/
+
+*.zip
+*.pth
+
+# MAS abre uma exceção APENAS para o seu modelo oficial validado
+!modelos_pre_treinados/baseline_inicial_200k.zip
+
+ppo_mesh_tensorboard/
+ppo_mesh_tensorboard_v2/
