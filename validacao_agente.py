@@ -6,7 +6,7 @@ print(" CARREGANDO A INTELIGÊNCIA ARTIFICIAL TREINADA")
 print("======================================================")
 
 env = AmbienteInjecaoFalhas(num_nos=20)
-modelo = PPO.load("modelos_pre_treinados/baseline_inicial_200k.zip")
+modelo = PPO.load("modelos_pre_treinados/baseline_ppo_mlp.zip")
 print("[OK] Modelo carregado com sucesso!\n")
 
 print("======================================================")

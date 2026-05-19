@@ -9,14 +9,32 @@ class AmbienteInjecaoFalhas(gym.Env):
         super(AmbienteInjecaoFalhas, self).__init__()
         self.num_nos = num_nos
 
-        # 1. ESPAÇO DE AÇÃO: O PPO escolhe um número de 0 a (N-1) para atacar
-        self.action_space = spaces.Discrete(self.num_nos)
+        if self.num_nos <= 20:
+            self.raio_comunicacao = 0.35
+            self.limite_passos = 15  # 75% da rede
+        elif self.num_nos <= 50:
+            self.raio_comunicacao = 0.22  # Evita que 50 nós formem um bloco indestrutível
+            self.limite_passos = 35  # 70% da rede
+        else:
+            self.raio_comunicacao = 0.15
+            self.limite_passos = int(self.num_nos * 0.7)
 
-        # 2. ESPAÇO DE OBSERVAÇÃO: A IA precisa ler o estado dos nós e quem está vivo
-        # Para simplificar a integração com o PPO agora, vamos retornar um vetor achatado
-        # contendo o status de cada nó (1 = Vivo, 0 = Destruído) e suas features.
-        tamanho_observacao = self.num_nos * 3  # (Status, CPU, Memória) para cada nó
-        self.observation_space = spaces.Box(low=0.0, high=1.0, shape=(tamanho_observacao,), dtype=np.float32)
+        # --- 2. ESPAÇO DE AÇÃO (A "Mão" do Agente) ---
+        # A IA pode escolher um botão de 0 até (num_nos - 1)
+        self.action_space = gym.spaces.Discrete(self.num_nos)
+
+        # --- 3. ESPAÇO DE OBSERVAÇÃO (Os "Olhos" do Agente) ---
+        # Matriz achatada: [Status, CPU, Memória] para cada nó.
+        # Se num_nos = 50, a IA lerá um vetor dinâmico de 150 posições.
+        self.observation_space = gym.spaces.Box(
+            low=0.0,
+            high=1.0,
+            shape=(self.num_nos * 3,),
+            dtype=np.float32
+        )
+
+        self.grafo = None
+        self.passos_dados = 0
 
     # FUNÇÃO EXECUTADA A CADA NOVO EPISÓDIO PARA GERAR UMA REDE NOVA
     def reset(self, seed=None, options=None):
@@ -24,9 +42,11 @@ class AmbienteInjecaoFalhas(gym.Env):
         semente_networkx = int(self.np_random.integers(0, 1000000))
 
         while True:
-            self.G = nx.random_geometric_graph(self.num_nos, radius=0.35, seed=semente_networkx)
+            self.G = nx.random_geometric_graph(self.num_nos, radius=self.raio_comunicacao)
+
             if nx.is_connected(self.G):
                 break
+
             semente_networkx = int(self.np_random.integers(0, 1000000))
 
         for node in self.G.nodes():
@@ -38,9 +58,14 @@ class AmbienteInjecaoFalhas(gym.Env):
 
         self.passos_dados = 0
 
-        # NOVIDADE: Precisamos gravar o estado "saudável" da rede para comparar depois
+        # --- OTIMIZAÇÃO MATEMÁTICA NO RESET ---
         self.latencia_original = nx.average_shortest_path_length(self.G)
-        self.redundancia_original = nx.average_node_connectivity(self.G)
+
+        if self.num_nos <= 20:
+            self.redundancia_original = nx.average_node_connectivity(self.G)
+        else:
+            # Usa a métrica global (muito mais leve e eficiente) para redes grandes
+            self.redundancia_original = nx.node_connectivity(self.G)
 
         return self._obter_observacao(), {}
 
@@ -59,7 +84,7 @@ class AmbienteInjecaoFalhas(gym.Env):
         terminou = False
         truncou = False
 
-        if self.passos_dados >= 15:
+        if self.passos_dados >= self.limite_passos:
             truncou = True
 
         if self.G.nodes[action]['status'] == 0.0:
@@ -73,7 +98,6 @@ class AmbienteInjecaoFalhas(gym.Env):
         nos_vivos = [n for n in self.G.nodes() if self.G.nodes[n]['status'] == 1.0]
         subgrafo = self.G.subgraph(nos_vivos)
 
-        # --- O NOVO JUIZ MULTI-CRITÉRIO ---
         info = {}
 
         # 1. Checagem Crítica: A rede partiu? (Liveness)
@@ -84,13 +108,19 @@ class AmbienteInjecaoFalhas(gym.Env):
         else:
             # 2. Avaliação de Degradação (Safety & Multi-path)
             latencia_atual = nx.average_shortest_path_length(subgrafo)
-            redundancia_atual = nx.average_node_connectivity(subgrafo)
+
+            if self.num_nos <= 20:
+                redundancia_atual = nx.average_node_connectivity(subgrafo)
+            else:
+                # Usa a métrica global para evitar explosão combinatória O(n^4)
+                redundancia_atual = nx.node_connectivity(subgrafo)
 
             # Limiar de Violação de SLA de Tempo
-            if latencia_atual >= (self.latencia_original * 1.5): # +50% da latência original
+            if latencia_atual >= (self.latencia_original * 1.5):  # +50% da latência original
                 recompensa = +100.0
                 terminou = True
-                info['propriedade_violada'] = f"Safety (Latência aumentou 50%+. Original: {self.latencia_original:.2f} | Atual: {latencia_atual:.2f})"
+                info[
+                    'propriedade_violada'] = f"Safety (Latência aumentou 50%+. Original: {self.latencia_original:.2f} | Atual: {latencia_atual:.2f})"
             else:
                 # Recompensa Parcial
                 aumento_latencia = latencia_atual - self.latencia_original
