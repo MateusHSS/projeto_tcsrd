@@ -1,12 +1,28 @@
 from stable_baselines3 import PPO
-from ambiente_mesh import AmbienteInjecaoFalhas
+from ambiente_mesh import AmbienteInjecaoFalhas, carregar_env
+
+# --- CONFIGURAÇÃO DO SIMULADOR (CARREGADA AUTOMATICAMENTE DO .ENV) ---
+env_config = carregar_env()
+USAR_NS3 = env_config.get("USAR_NS3", "False").lower() in ("true", "1", "yes")
+NS3_PATH = env_config.get("NS3_PATH", "/home/vinisilvag/ns-3.48")
+NUM_NOS = 20  # Tamanho da rede Mesh a simular
 
 print("======================================================")
-print(" CARREGANDO A INTELIGÊNCIA ARTIFICIAL TREINADA")
+print(f" CARREGANDO A IA TREINADA (Modo NS-3: {USAR_NS3})")
 print("======================================================")
 
-env = AmbienteInjecaoFalhas(num_nos=20)
-modelo = PPO.load("modelos_pre_treinados/baseline_ppo_mlp.zip")
+# Cria o ambiente modularizado
+env = AmbienteInjecaoFalhas(num_nos=NUM_NOS, usar_ns3=USAR_NS3, ns3_path=NS3_PATH)
+
+# Carrega o modelo calibrado correspondente
+caminho_modelo = "modelos_pre_treinados/escala_50_ppo_mlp_ns3" if USAR_NS3 else "modelos_pre_treinados/baseline_ppo_mlp"
+# Caso o arquivo da escala 50 do NS-3 ainda não tenha sido gerado, tenta o baseline geral
+try:
+    modelo = PPO.load(caminho_modelo)
+except Exception:
+    print(f"[Aviso] Modelo {caminho_modelo} não encontrado. Tentando baseline_ppo_mlp...")
+    modelo = PPO.load("modelos_pre_treinados/baseline_ppo_mlp.zip")
+
 print("[OK] Modelo carregado com sucesso!\n")
 
 print("======================================================")
@@ -46,3 +62,4 @@ else:
 print(f"Total de Ataques Necessários : {passo}")
 print(f"Propriedade Violada          : {motivo_da_queda}")
 print(f"Recompensa Acumulada         : {recompensa_total:.2f}")
+print("======================================================")

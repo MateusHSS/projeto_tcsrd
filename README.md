@@ -32,13 +32,28 @@ Diferente de abordagens tradicionais que avaliam apenas se a rede se dividiu, es
 ## 📁 Estrutura do Repositório
 
 ```text
-├── ambiente_mesh.py         # Classe do ambiente Gymnasium (Regras do jogo e Recompensas)
-├── treinamento_ppo.py       # Script para treino em larga escala (200.000 passos paralelos)
+├── ambiente_mesh.py         # Classe do ambiente Gymnasium (Suporta NetworkX e NS-3)
+├── mesh_simulation_sla.cc   # Simulação C++ física para o NS-3
+├── treinamento_ppo.py       # Script para treino/fine-tuning (MlpPolicy)
+├── treinamento_ppo_gat.py   # Script para treino/fine-tuning (GATPolicy)
 ├── validacao_agente.py      # Script de teste para carregar o modelo e gerar relatórios
-├── modelos_pre_treinados/   # Pasta binária para os melhores cérebros (ignorada em parte pelo Git)
-│   └── baseline_inicial_200k.zip # Modelo treinado atual (Baseline usando rede linear)
+├── modelos_pre_treinados/   # Pasta binária para os melhores cérebros
+│   ├── baseline_ppo_mlp.zip      # Baseline treinado em NetworkX (MLP)
+│   ├── escala_50_ppo_mlp.zip     # MLP de escala 50
+│   └── escala_50_ppo_gat.zip     # GAT de escala 50
 └── README.md                # Esta documentação
 ```
+
+## ⚙️ Alternando entre NetworkX e NS-3 (Arquivo .env)
+
+Para alternar entre a simulação matemática rápida do **NetworkX** e a simulação de tráfego física do **NS-3.48**, basta editar as variáveis no arquivo `.env` localizado na raiz do projeto:
+
+* **`USAR_NS3`**: Defina como `True` para habilitar o NS-3 ou `False` para usar o NetworkX.
+* **`NS3_PATH`**: Caminho da instalação do NS-3 (ex: `/home/vinisilvag/ns-3.48`).
+
+Todos os scripts do repositório ([ambiente_mesh.py](file:///home/vinisilvag/ufmg/11%C2%BA%20Per%C3%ADodo/Confiabilidade%20em%20Sistemas%20de%20Redes%20Distribu%C3%ADdos/Projeto/projeto_tcsrd/ambiente_mesh.py), [treinamento_ppo.py](file:///home/vinisilvag/ufmg/11%C2%BA%20Per%C3%ADodo/Confiabilidade%20em%20Sistemas%20de%20Redes%20Distribu%C3%ADdos/Projeto/projeto_tcsrd/treinamento_ppo.py), [treinamento_ppo_gat.py](file:///home/vinisilvag/ufmg/11%C2%BA%20Per%C3%ADodo/Confiabilidade%20em%20Sistemas%20de%20Redes%20Distribu%C3%ADdos/Projeto/projeto_tcsrd/treinamento_ppo_gat.py) e [validacao_agente.py](file:///home/vinisilvag/ufmg/11%C2%BA%20Per%C3%ADodo/Confiabilidade%20em%20Sistemas%20de%20Redes%20Distribu%C3%ADdos/Projeto/projeto_tcsrd/validacao_agente.py)) lêem essa configuração dinamicamente a partir deste arquivo centralizado.
+
+---
 
 ## 🚀 Como Executar
 
