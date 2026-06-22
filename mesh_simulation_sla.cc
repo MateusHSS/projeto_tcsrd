@@ -19,8 +19,12 @@ using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE("MeshSlaSimulation");
 
-// Função auxiliar para quebrar strings separadas por vírgula em um conjunto de
-// IDs
+/**
+ * @brief Parses a comma-separated string containing failed node IDs.
+ *
+ * @param failedNodesStr String with comma-separated node IDs.
+ * @return std::set<uint32_t> Set containing the parsed node IDs.
+ */
 std::set<uint32_t> ParseFailedNodes(std::string failedNodesStr) {
   std::set<uint32_t> failedNodes;
   if (failedNodesStr == "none" || failedNodesStr == "-1" || failedNodesStr.empty()) {
@@ -36,7 +40,14 @@ std::set<uint32_t> ParseFailedNodes(std::string failedNodesStr) {
   return failedNodes;
 }
 
-// Função auxiliar para converter lista de doubles separada por vírgula
+/**
+ * @brief Parses a comma-separated list of float values into a double vector.
+ *
+ * @param str Comma-separated double values.
+ * @param numNodes Expected number of elements.
+ * @param defaultVal Default value to fill if list is shorter than numNodes.
+ * @return std::vector<double> Vector containing double values.
+ */
 std::vector<double> ParseDoubleList(std::string str, uint32_t numNodes,
                                     double defaultVal) {
   std::vector<double> vec(numNodes, defaultVal);
@@ -52,8 +63,13 @@ std::vector<double> ParseDoubleList(std::string str, uint32_t numNodes,
   return vec;
 }
 
-// Função auxiliar para parsear as coordenadas X,Y de cada nó enviadas pelo
-// Python
+/**
+ * @brief Parses a list of comma-separated coordinates into Vector values.
+ *
+ * @param posStr Coordinates representation (x0,y0,x1,y1...).
+ * @param numNodes Expected number of nodes.
+ * @return std::vector<Vector> Vector containing 3D coordinates.
+ */
 std::vector<Vector> ParsePositions(std::string posStr, uint32_t numNodes) {
   std::vector<Vector> positions;
   std::stringstream ss(posStr);
@@ -61,23 +77,37 @@ std::vector<Vector> ParsePositions(std::string posStr, uint32_t numNodes) {
   while (std::getline(ss, xStr, ',') && std::getline(ss, yStr, ',')) {
     positions.push_back(Vector(std::stod(xStr), std::stod(yStr), 0.0));
   }
-  // Preenche com coordenadas seguras caso haja alguma inconsistência numérica
   while (positions.size() < numNodes) {
     positions.push_back(Vector(0.0, 0.0, 0.0));
   }
   return positions;
 }
 
-// Callback fantasma para descartar pacotes em nós desativados de forma segura
+/**
+ * @brief Dummy callback function to drop incoming packets safely on disabled nodes.
+ *
+ * @param device The network device receiving the packet.
+ * @param packet The packet received.
+ * @param protocol The protocol identifier.
+ * @param sender The sender's address.
+ * @return true Always returns true to discard.
+ */
 bool DummyReceiveCallback(Ptr<NetDevice> device, Ptr<const Packet> packet,
                           uint16_t protocol, const Address &sender) {
   return true;
 }
 
+/**
+ * @brief Main execution function for physical NS-3 mesh SLA simulation.
+ *
+ * @param argc CLI argument count.
+ * @param argv CLI argument values.
+ * @return int Exit status.
+ */
 int main(int argc, char *argv[]) {
   uint32_t numNodes = 20;
-  double simTime = 3.0; // Tempo de simulação (segundos)
-  double range = 175.0; // Alcance do canal geométrico de comunicação em metros
+  double simTime = 3.0;
+  double range = 175.0;
   std::string failedNodesArg = "";
   std::string cpuValuesArg = "";
   std::string memValuesArg = "";
@@ -106,8 +136,6 @@ int main(int argc, char *argv[]) {
   NodeContainer nodes;
   nodes.Create(numNodes);
 
-  // Configuração de Mobilidade (Define a posição física exata dos nós vinda do
-  // NetworkX)
   MobilityHelper mobility;
   Ptr<ListPositionAllocator> positionAlloc =
       CreateObject<ListPositionAllocator>();
@@ -118,26 +146,18 @@ int main(int argc, char *argv[]) {
   mobility.SetMobilityModel("ns3::ConstantPositionMobilityModel");
   mobility.Install(nodes);
 
-  // Instalação do Stack WiFi e do Canal de Comunicação com limite físico de
-  // alcance
   WifiHelper wifi;
   YansWifiPhyHelper wifiPhy;
   YansWifiChannelHelper wifiChannel = YansWifiChannelHelper::Default();
   wifiChannel.SetPropagationDelay("ns3::ConstantSpeedPropagationDelayModel");
-
-  // RangePropagationLossModel se comporta de forma idêntica ao raio geométrico
-  // do NetworkX
   wifiChannel.AddPropagationLoss("ns3::RangePropagationLossModel", "MaxRange",
                                  DoubleValue(range));
   wifiPhy.SetChannel(wifiChannel.Create());
 
-  // Define a tecnologia de rede Mesh 802.11s baseada em HWMP (Hybrid Wireless
-  // Mesh Protocol)
   MeshHelper mesh = MeshHelper::Default();
   mesh.SetStackInstaller("ns3::Dot11sStack");
   NetDeviceContainer devices = mesh.Install(wifiPhy, nodes);
 
-  // Instalação da pilha TCP/IP
   InternetStackHelper internet;
   internet.Install(nodes);
 
@@ -145,25 +165,17 @@ int main(int argc, char *argv[]) {
   ipv4.SetBase("10.1.1.0", "255.255.255.0");
   Ipv4InterfaceContainer interfaces = ipv4.Assign(devices);
 
-  // Aplicação da Injeção de Falhas e Efeitos de Variabilidade (Congestionamento
-  // CPU/Memória)
   for (uint32_t i = 0; i < numNodes; ++i) {
     Ptr<Node> node = nodes.Get(i);
 
     if (failedNodes.find(i) != failedNodes.end()) {
-      // Desativa completamente o encaminhamento IP e as interfaces de rede do
-      // nó falho
       Ptr<Ipv4> nodeIpv4 = node->GetObject<Ipv4>();
       if (nodeIpv4) {
-        // Preserva a interface Loopback (índice 0) para evitar travamento do protocolo IP,
-        // desativando apenas as interfaces físicas reais de comunicação (índices >= 1).
         for (uint32_t iface = 1; iface < nodeIpv4->GetNInterfaces(); ++iface) {
           nodeIpv4->SetDown(iface);
           nodeIpv4->SetForwarding(iface, false);
         }
       }
-      // Anula callbacks de recebimento a nível de NetDevice apenas para dispositivos Wifi/Mesh,
-      // preservando o dispositivo de Loopback para evitar falhas e crashes no protocolo IP.
       for (uint32_t d = 0; d < node->GetNDevices(); ++d) {
         Ptr<NetDevice> dev = node->GetDevice(d);
         if (DynamicCast<MeshPointDevice>(dev) || DynamicCast<WifiNetDevice>(dev)) {
@@ -171,13 +183,8 @@ int main(int argc, char *argv[]) {
         }
       }
     } else {
-      // Nó ativo: Calcula a taxa de erro agregada (PER) baseada na CPU e
-      // Memória
       double cpu = cpus[i];
       double mem = mems[i];
-
-      // Fatores de perda: quanto menor o recurso (cpu/mem), maior a perda local
-      // de tráfego
       double errorRate = (1.0 - cpu) * 0.15 + (1.0 - mem) * 0.10;
 
       if (errorRate > 0.0) {
@@ -200,7 +207,6 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  // Instala receptores de tráfego UDP (PacketSinks) em todos os nós ativos
   uint16_t port = 9;
   PacketSinkHelper sink(
       "ns3::UdpSocketFactory",
@@ -209,8 +215,6 @@ int main(int argc, char *argv[]) {
   sinkApps.Start(Seconds(0.5));
   sinkApps.Stop(Seconds(simTime));
 
-  // Cria geradores de tráfego UDP (OnOff) ligando todos os pares possíveis de
-  // nós ativos
   for (uint32_t i = 0; i < numNodes; ++i) {
     if (failedNodes.find(i) != failedNodes.end())
       continue;
@@ -225,8 +229,6 @@ int main(int argc, char *argv[]) {
           "OnTime", StringValue("ns3::ConstantRandomVariable[Constant=1.0]"));
       onoff.SetAttribute(
           "OffTime", StringValue("ns3::ConstantRandomVariable[Constant=0.0]"));
-
-      // Taxa moderada para evitar saturação excessiva em redes grandes
       onoff.SetAttribute("DataRate", DataRateValue(DataRate("20Kbps")));
       onoff.SetAttribute("PacketSize", UintegerValue(256));
 
@@ -236,14 +238,12 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  // Instala o monitoramento de fluxos de rede
   FlowMonitorHelper flowmon;
   Ptr<FlowMonitor> monitor = flowmon.InstallAll();
 
   Simulator::Stop(Seconds(simTime));
   Simulator::Run();
 
-  // Agrega as estatísticas do FlowMonitor
   monitor->CheckForLostPackets();
   Ptr<Ipv4FlowClassifier> classifier =
       DynamicCast<Ipv4FlowClassifier>(flowmon.GetClassifier());
@@ -270,7 +270,6 @@ int main(int argc, char *argv[]) {
 
   Simulator::Destroy();
 
-  // Exibição em formato JSON lido diretamente pelo subprocesso Python
   std::cout << "{"
             << "\"pdr\":" << pdr << ","
             << "\"avg_delay\":" << avgDelay << ","

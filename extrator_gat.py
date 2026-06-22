@@ -5,9 +5,19 @@ from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from torch_geometric.nn import GATConv
 from torch_geometric.data import Data, Batch
 
-
 class ExtratorFeaturesGAT(BaseFeaturesExtractor):
+    """Custom features extractor using Graph Attention Networks (GAT) for stable-baselines3.
+
+    Processes flat observation vectors into graphs and runs GAT convolutions on them.
+    """
     def __init__(self, observation_space: gym.spaces.Box, features_dim: int = 256, num_nos: int = 20):
+        """Initializes the GAT feature extractor.
+
+        Args:
+            observation_space (gym.spaces.Box): The observation space of the environment.
+            features_dim (int): Dimension of the output features.
+            num_nos (int): Number of nodes in the network topology.
+        """
         super().__init__(observation_space, features_dim)
         self.num_nos = num_nos
         self.num_features_no = 3
@@ -15,12 +25,17 @@ class ExtratorFeaturesGAT(BaseFeaturesExtractor):
         self.gat1 = GATConv(in_channels=self.num_features_no, out_channels=16, heads=4, concat=True)
         self.gat2 = GATConv(in_channels=64, out_channels=32, heads=1, concat=False)
         self.activation = nn.ELU()
-
-        # Projetamos de (20 nós * 32 features = 640) para features_dim.
-        # Assim mantemos a identidade individual de cada nó!
         self.fc_saida = nn.Linear(self.num_nos * 32, features_dim)
 
     def forward(self, observations: torch.Tensor) -> torch.Tensor:
+        """Forward pass to extract graph features from flat observations.
+
+        Args:
+            observations (torch.Tensor): Flattened observation tensor of shape (batch_size, num_nos * 3).
+
+        Returns:
+            torch.Tensor: Feature representation tensor of shape (batch_size, features_dim).
+        """
         batch_size = observations.size(0)
         dispositivo = observations.device
         lista_grafos = []
@@ -51,6 +66,5 @@ class ExtratorFeaturesGAT(BaseFeaturesExtractor):
         h = self.activation(h)
 
         h_achatado = h.view(batch_size, self.num_nos * 32)
-
         saida_ppo = self.fc_saida(h_achatado)
         return saida_ppo

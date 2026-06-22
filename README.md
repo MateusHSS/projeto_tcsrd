@@ -1,111 +1,136 @@
-# Injeção de Faltas Guiada por Propriedades em Redes Mesh usando Aprendizado por Reforço
+# Property-Guided Fault Injection in Mesh Networks Using Reinforcement Learning
 
-Este repositório contém o framework de Inteligência Artificial desenvolvido para avaliar a resiliência de redes dinâmicas (Mesh/Roteamento) através de ataques direcionados e automatizados. O sistema utiliza **Aprendizado por Reforço Deep (PPO)** para descobrir vulnerabilidades topológicas complexas em grafos, avaliando propriedades fundamentais de comunicação além da conectividade básica.
+This repository contains an Artificial Intelligence framework designed to evaluate the resilience of dynamic mesh networks through directed and automated attacks. The system uses Deep Reinforcement Learning (PPO) to discover complex topological vulnerabilities in graphs, assessing key communication properties beyond basic connectivity.
 
-O objetivo final deste framework é servir como o motor de decisão inteligente para simulações de injeção de faltas em larga escala no simulador de eventos discretos **NS-3**.
-
----
-
-## 🏗️ Arquitetura do Sistema
-
-O framework é estruturado seguindo o padrão do ecossistema de Aprendizado por Reforço em Python, utilizando `Gymnasium` para a modelação do ambiente e `Stable-Baselines3` para os algoritmos de treino.
-
-1. **Ambiente (`AmbienteInjecaoFalhas`):** Modela a rede Mesh como um grafo geométrico aleatório utilizando `NetworkX`. Cada nó possui atributos dinâmicos (como estado de ativação e métricas internas).
-2. **Juiz Multi-Critério:** A cada ação do agente, o ambiente calcula o impacto em tempo real na topologia e pune/premeia o agente baseado em acordos de nível de serviço (SLA).
-3. **Agente (PPO):** Uma rede neuronal que observa o estado atual da malha e decide qual o nó crítico a derrubar para maximizar a degradação do sistema.
+The framework serves as the decision engine for large-scale fault injection simulations in the NS-3 discrete event simulator.
 
 ---
 
-## 📊 Propriedades de Comunicação Validadas
+## System Architecture
 
-Diferente de abordagens tradicionais que avaliam apenas se a rede se dividiu, este ambiente calcula penalizações contínuas (Dense Rewards) baseadas nas seguintes métricas da proposta de tese:
+The framework is structured using standard Python reinforcement learning libraries, using Gymnasium for environment modeling and Stable-Baselines3 for training algorithms.
 
-
-| Propriedade                      | Métrica Matemática (NetworkX)      | Critério de Violação Crítica                                                             |
-| :------------------------------- | :----------------------------------- | :------------------------------------------------------------------------------------------- |
-| **Liveness (Conectividade)**     | `nx.is_connected(G)`                 | A rede é particionada em dois ou mais componentes desconexos.                               |
-| **Safety (Latência Fim-a-Fim)** | `nx.average_shortest_path_length(G)` | A latência média do caminho mínimo aumenta**50% ou mais** em relação à rede saudável. |
-| **Multi-path Availability**      | `nx.average_node_connectivity(G)`    | Mede a redundância residual (quantos nós precisam de falhar para desconectar a rede).      |
+1. Environment (AmbienteInjecaoFalhas): Models the Mesh network as a random geometric graph using NetworkX. Each node has dynamic attributes such as activation status and internal metrics.
+2. Multi-Criteria Evaluator: For every agent action, the environment computes the real-time impact on the topology and penalizes or rewards the agent based on Service Level Agreements (SLA).
+3. Agent (PPO): A neural network that observes the current state of the mesh and decides which critical node to disable to maximize system degradation.
 
 ---
 
-## 📁 Estrutura do Repositório
+## Validated Communication Properties
+
+Unlike traditional approaches that only check if the network partitioned, this environment calculates continuous rewards (dense rewards) based on the following metrics:
+
+| Property | Mathematical Metric (NetworkX) | Critical Violation Criterion |
+| :--- | :--- | :--- |
+| Liveness (Connectivity) | nx.is_connected(G) | The network partitions into two or more disconnected components. |
+| Safety (End-to-End Latency) | nx.average_shortest_path_length(G) | The average shortest path length increases by 50% or more compared to the healthy network. |
+| Multi-path Availability | nx.average_node_connectivity(G) | Measures residual redundancy (how many nodes need to fail to disconnect the network). |
+
+---
+
+## Repository Structure
 
 ```text
-├── ambiente_mesh.py         # Classe do ambiente Gymnasium (Suporta NetworkX e NS-3)
-├── mesh_simulation_sla.cc   # Simulação C++ física para o NS-3
-├── treinamento_ppo.py       # Script para treino/fine-tuning (MlpPolicy)
-├── treinamento_ppo_gat.py   # Script para treino/fine-tuning (GATPolicy)
-├── validacao_agente.py      # Script de teste para carregar o modelo e gerar relatórios
-├── modelos_pre_treinados/   # Pasta binária para os melhores cérebros
-│   ├── baseline_ppo_mlp.zip      # Baseline treinado em NetworkX (MLP)
-│   ├── escala_50_ppo_mlp.zip     # MLP de escala 50
-│   └── escala_50_ppo_gat.zip     # GAT de escala 50
-└── README.md                # Esta documentação
+├── ambiente_mesh.py         # Gymnasium environment class (supports NetworkX and NS-3)
+├── extrator_gat.py          # Feature extractor using Graph Attention Networks (GAT)
+├── instance_generator.py    # Parameterized script to generate fixed network topologies
+├── mesh_simulation_sla.cc   # Physical C++ simulation script for NS-3
+├── treinamento_ppo.py       # Training and fine-tuning script using MLP policies
+├── treinamento_ppo_gat.py   # Training and fine-tuning script using GAT policies
+├── validacao_agente.py      # Validation script to load trained agents and run tests
+├── instances/               # Folder containing generated network topologies (CSV)
+│   ├── train_50.csv        # Fixed training topology instances (50 nodes)
+│   └── val_20.csv           # Fixed validation topology instances (20 nodes)
+├── modelos_pre_treinados/   # Directory containing pre-trained model checkpoints
+│   ├── baseline_ppo_mlp.zip      # MLP policy trained on NetworkX
+│   ├── escala_50_ppo_mlp.zip     # MLP policy for 50-node scale
+│   └── escala_50_ppo_gat.zip     # GAT policy for 50-node scale
+└── README.md                # System documentation
 ```
-
-## ⚙️ Alternando entre NetworkX e NS-3 (Arquivo .env)
-
-Para alternar entre a simulação matemática rápida do **NetworkX** e a simulação de tráfego física do **NS-3.48**, basta editar as variáveis no arquivo `.env` localizado na raiz do projeto:
-
-* **`USAR_NS3`**: Defina como `True` para habilitar o NS-3 ou `False` para usar o NetworkX.
-* **`NS3_PATH`**: Caminho da instalação do NS-3 (ex: `/home/vinisilvag/ns-3.48`).
-
-Todos os scripts do repositório ([ambiente_mesh.py](file:///home/vinisilvag/ufmg/11%C2%BA%20Per%C3%ADodo/Confiabilidade%20em%20Sistemas%20de%20Redes%20Distribu%C3%ADdos/Projeto/projeto_tcsrd/ambiente_mesh.py), [treinamento_ppo.py](file:///home/vinisilvag/ufmg/11%C2%BA%20Per%C3%ADodo/Confiabilidade%20em%20Sistemas%20de%20Redes%20Distribu%C3%ADdos/Projeto/projeto_tcsrd/treinamento_ppo.py), [treinamento_ppo_gat.py](file:///home/vinisilvag/ufmg/11%C2%BA%20Per%C3%ADodo/Confiabilidade%20em%20Sistemas%20de%20Redes%20Distribu%C3%ADdos/Projeto/projeto_tcsrd/treinamento_ppo_gat.py) e [validacao_agente.py](file:///home/vinisilvag/ufmg/11%C2%BA%20Per%C3%ADodo/Confiabilidade%20em%20Sistemas%20de%20Redes%20Distribu%C3%ADdos/Projeto/projeto_tcsrd/validacao_agente.py)) lêem essa configuração dinamicamente a partir deste arquivo centralizado.
 
 ---
 
-## 🚀 Como Executar
+## Switching Between NetworkX and NS-3 (.env File)
 
-1. **Pré-requisitos**
+To toggle between fast mathematical simulation using NetworkX and real packet-level traffic simulation using NS-3, edit the variables in the .env file in the repository root:
 
-Em um ambiente virtual com Python 3.8+, instale as dependências do projeto:
+* USAR_NS3: Set to True to enable NS-3 simulations, or False to use NetworkX.
+* NS3_PATH: Path to your local NS-3 installation directory (e.g., /home/username/ns-3.48).
 
+All training and validation scripts read this configuration dynamically.
 
-Bash
+---
 
+## How to Run
+
+1. Installation
+
+Set up a virtual environment (Python 3.8+) and install the dependencies:
+
+```bash
 pip install -r requirements.txt
+```
 
-2. **Treinar o Agente do Zero**
+2. Generating Fixed Network Topologies
 
-Para iniciar o treino profundo com 4 ambientes paralelos e 200.000 passos de exploração (ajustado com coeficiente de entropia para maior criatividade do agente):
-Bash
+To generate reproducible datasets of network configurations, run the generator script:
 
+```bash
+# Generate 100 training instances with 50 nodes
+python instance_generator.py --num_instances 100 --num_nodes 50 --output instances/train_50.csv --seed 42
+
+# Generate 20 validation instances with 20 nodes
+python instance_generator.py --num_instances 20 --num_nodes 20 --output instances/val_20.csv --seed 100
+```
+
+3. Training the Agent
+
+To start training the policy using the generated training dataset:
+
+```bash
 python treinamento_ppo.py
+```
 
-O modelo final será guardado automaticamente na pasta modelos_pre_treinados/baseline_ppo_mlp.zip.
-3. **Executar a Validação / Teste de Injeção**
+Or for GAT training:
 
-Para carregar o modelo treinado e ver a IA atacando a infraestrutura em tempo real, gerando o relatório final de propriedades violadas:
-Bash
+```bash
+python treinamento_ppo_gat.py
+```
 
+The resulting model is automatically saved to the modelos_pre_treinados/ directory.
+
+4. Validation
+
+To run validation on a fixed network configuration from the generated validation dataset (using a specific instance ID like 0 for reproducibility):
+
+```bash
 python validacao_agente.py
+```
 
-## 📉 Exemplo de Output da Validação
+---
 
-Quando o agente é executado, ele exibe passo a passo a sua estratégia de ataque. Repare nas recompensas intermediárias positivas, provando que a IA aprendeu a estrangular a latência antes de quebrar a conectividade:
-Plaintext
+## Validation Output Example
+
+When running the validation script, the step-by-step attack decisions are displayed:
+
+```text
+======================================================
+ CARREGANDO A IA TREINADA (Modo NS-3: True)
+======================================================
+[Aviso] Modelo modelos_pre_treinados/escala_50_ppo_mlp_ns3 não encontrado. Tentando baseline_ppo_mlp...
+[OK] Modelo carregado com sucesso!
 
 ======================================================
-CARREGANDO A INTELIGÊNCIA ARTIFICIAL TREINADA
-==============================================
-
-[OK] Modelo carregado com sucesso da pasta de pré-treinados!
+ INICIANDO O ATAQUE GUIADO PELA IA
+======================================================
+Passo 01 | IA atacou o Nó 08 | Recompensa: 100.00
 
 ======================================================
-INICIANDO O ATAQUE GUIADO PELA IA
-=================================
-
-Passo 01 | IA atacou o Nó 00 | Recompensa:   1.64
-Passo 02 | IA atacou o Nó 13 | Recompensa:   1.67
-Passo 03 | IA atacou o Nó 12 | Recompensa:   2.00
-Passo 04 | IA atacou o Nó 08 | Recompensa: 100.00
-
+ RELATÓRIO FINAL DA INJEÇÃO DE FALHAS
 ======================================================
-RELATÓRIO FINAL DA INJEÇÃO DE FALHAS
-=======================================
-
 Status: [SUCESSO DO ATAQUE]
-Total de Ataques Necessários : 4
-Propriedade Violada          : Liveness (Conectividade Rompida - Rede Particionada)
-Recompensa Acumulada         : 105.31
+Total de Ataques Necessários : 1
+Propriedade Violada          : Safety (Atraso médio aumentou 50%+. Original: 90.86ms | Atual: 236.05ms)
+Recompensa Acumulada         : 100.00
+======================================================
+```

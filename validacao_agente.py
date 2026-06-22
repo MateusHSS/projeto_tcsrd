@@ -1,65 +1,79 @@
+"""Validation script to load pre-trained agents and run fault injection testing on fixed mesh topology instances."""
+
+import os
 from stable_baselines3 import PPO
 from ambiente_mesh import AmbienteInjecaoFalhas, carregar_env
 
-# --- CONFIGURAÇÃO DO SIMULADOR (CARREGADA AUTOMATICAMENTE DO .ENV) ---
-env_config = carregar_env()
-USAR_NS3 = env_config.get("USAR_NS3", "False").lower() in ("true", "1", "yes")
-NS3_PATH = env_config.get("NS3_PATH", "/home/vinisilvag/ns-3.48")
-NUM_NOS = 20  # Tamanho da rede Mesh a simular
+def main():
+    """Main function to run the validation agent simulation workflow."""
+    env_config = carregar_env()
+    USAR_NS3 = env_config.get("USAR_NS3", "False").lower() in ("true", "1", "yes")
+    NS3_PATH = env_config.get("NS3_PATH")
+    
+    if USAR_NS3:
+        if not NS3_PATH or NS3_PATH == "/home/user/ns-3.48":
+            raise ValueError("NS3_PATH must be explicitly configured in the environment or .env file when USAR_NS3=True.")
+        if not os.path.exists(NS3_PATH):
+            raise FileNotFoundError(f"The specified NS3_PATH does not exist: {NS3_PATH}")
+    else:
+        NS3_PATH = NS3_PATH or "/home/user/ns-3.48"
 
-print("======================================================")
-print(f" CARREGANDO A IA TREINADA (Modo NS-3: {USAR_NS3})")
-print("======================================================")
+    NUM_NOS = 20
 
-# Cria o ambiente modularizado
-env = AmbienteInjecaoFalhas(num_nos=NUM_NOS, usar_ns3=USAR_NS3, ns3_path=NS3_PATH)
+    print("======================================================")
+    print(f" CARREGANDO A IA TREINADA (Modo NS-3: {USAR_NS3})")
+    print("======================================================")
 
-# Carrega o modelo calibrado correspondente
-caminho_modelo = "modelos_pre_treinados/escala_50_ppo_mlp_ns3" if USAR_NS3 else "modelos_pre_treinados/baseline_ppo_mlp"
-# Caso o arquivo da escala 50 do NS-3 ainda não tenha sido gerado, tenta o baseline geral
-try:
-    modelo = PPO.load(caminho_modelo)
-except Exception:
-    print(f"[Aviso] Modelo {caminho_modelo} não encontrado. Tentando baseline_ppo_mlp...")
-    modelo = PPO.load("modelos_pre_treinados/baseline_ppo_mlp.zip")
+    caminho_instancias = "instances/val_20.csv"
+    env = AmbienteInjecaoFalhas(num_nos=NUM_NOS, usar_ns3=USAR_NS3, ns3_path=NS3_PATH, caminho_instancias=caminho_instancias)
 
-print("[OK] Modelo carregado com sucesso!\n")
+    caminho_modelo = "modelos_pre_treinados/escala_50_ppo_mlp_ns3" if USAR_NS3 else "modelos_pre_treinados/baseline_ppo_mlp"
 
-print("======================================================")
-print(" INICIANDO O ATAQUE GUIADO PELA IA")
-print("======================================================")
+    try:
+        modelo = PPO.load(caminho_modelo)
+    except Exception:
+        print(f"[Aviso] Modelo {caminho_modelo} não encontrado. Tentando baseline_ppo_mlp...")
+        modelo = PPO.load("modelos_pre_treinados/baseline_ppo_mlp.zip")
 
-obs, _ = env.reset()
-episodio_terminou = False
-passo = 0
-recompensa_total = 0
-motivo_da_queda = "A rede sobreviveu ao limite de ataques."  # Mensagem padrão
+    print("[OK] Modelo carregado com sucesso!\n")
 
-while not episodio_terminou:
-    passo += 1
-    acao, _ = modelo.predict(obs, deterministic=True)
-    acao = int(acao)
+    print("======================================================")
+    print(" INICIANDO O ATAQUE GUIADO PELA IA")
+    print("======================================================")
 
-    obs, recompensa, terminou, truncou, info = env.step(acao)
-    recompensa_total += recompensa
+    obs, _ = env.reset(options={"instancia_id": 0})
+    episodio_terminou = False
+    passo = 0
+    recompensa_total = 0
+    motivo_da_queda = "A rede sobreviveu ao limite de ataques."
 
-    print(f"Passo {passo:02d} | IA atacou o Nó {acao:02d} | Recompensa: {recompensa:6.2f}")
+    while not episodio_terminou:
+        passo += 1
+        acao, _ = modelo.predict(obs, deterministic=True)
+        acao = int(acao)
 
-    # Se a rede quebrou neste turno, nós salvamos o motivo exato extraído do ambiente!
-    if terminou:
-        motivo_da_queda = info.get('propriedade_violada', 'Erro: Motivo não registrado.')
+        obs, recompensa, terminou, truncou, info = env.step(acao)
+        recompensa_total += recompensa
 
-    episodio_terminou = terminou or truncou
+        print(f"Passo {passo:02d} | IA atacou o Nó {acao:02d} | Recompensa: {recompensa:6.2f}")
 
-print("\n======================================================")
-print(" RELATÓRIO FINAL DA INJEÇÃO DE FALHAS")
-print("======================================================")
-if recompensa_total > 0:
-    print("Status: [SUCESSO DO ATAQUE]")
-else:
-    print("Status: [FALHA DO ATAQUE - RESILIÊNCIA COMPROVADA]")
+        if terminou:
+            motivo_da_queda = info.get('propriedade_violada', 'Erro: Motivo não registrado.')
 
-print(f"Total de Ataques Necessários : {passo}")
-print(f"Propriedade Violada          : {motivo_da_queda}")
-print(f"Recompensa Acumulada         : {recompensa_total:.2f}")
-print("======================================================")
+        episodio_terminou = terminou or truncou
+
+    print("\n======================================================")
+    print(" RELATÓRIO FINAL DA INJEÇÃO DE FALHAS")
+    print("======================================================")
+    if recompensa_total > 0:
+        print("Status: [SUCESSO DO ATAQUE]")
+    else:
+        print("Status: [FALHA DO ATAQUE - RESILIÊNCIA COMPROVADA]")
+
+    print(f"Total de Ataques Necessários : {passo}")
+    print(f"Propriedade Violada          : {motivo_da_queda}")
+    print(f"Recompensa Acumulada         : {recompensa_total:.2f}")
+    print("======================================================")
+
+if __name__ == "__main__":
+    main()
