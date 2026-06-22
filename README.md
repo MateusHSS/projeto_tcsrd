@@ -34,10 +34,10 @@ Unlike traditional approaches that only check if the network partitioned, this e
 ├── ambiente_mesh.py         # Gymnasium environment class (supports NetworkX and NS-3)
 ├── extrator_gat.py          # Feature extractor using Graph Attention Networks (GAT)
 ├── instance_generator.py    # Parameterized script to generate fixed network topologies
-├── mesh_simulation_sla.cc   # Physical C++ simulation script for NS-3
-├── treinamento_ppo.py       # Training and fine-tuning script using MLP policies
-├── treinamento_ppo_gat.py   # Training and fine-tuning script using GAT policies
-├── validacao_agente.py      # Validation script to load trained agents and run tests
+├── mesh_simulation.cc       # Physical C++ simulation script for NS-3
+├── train_ppo.py             # Training and fine-tuning script using MLP policies
+├── train_ppo_gat.py         # Training and fine-tuning script using GAT policies
+├── validate_agent.py        # Validation script to load trained agents and run tests
 ├── instances/               # Folder containing generated network topologies (CSV)
 │   ├── train_50.csv        # Fixed training topology instances (50 nodes)
 │   └── val_20.csv           # Fixed validation topology instances (20 nodes)
@@ -52,9 +52,9 @@ Unlike traditional approaches that only check if the network partitioned, this e
 
 ## Switching Between NetworkX and NS-3 (.env File)
 
-To toggle between fast mathematical simulation using NetworkX and real packet-level traffic simulation using NS-3, edit the variables in the .env file in the repository root:
+To toggle between fast mathematical simulation using NetworkX and real packet-level traffic simulation using NS-3, edit the variables in the `.env` file in the repository root:
 
-* USAR_NS3: Set to True to enable NS-3 simulations, or False to use NetworkX.
+* USE_NS3: Set to True to enable NS-3 simulations, or False to use NetworkX.
 * NS3_PATH: Path to your local NS-3 installation directory (e.g., /home/username/ns-3.48).
 
 All training and validation scripts read this configuration dynamically.
@@ -88,13 +88,13 @@ python instance_generator.py --num_instances 20 --num_nodes 20 --output instance
 To start training the policy using the generated training dataset:
 
 ```bash
-python treinamento_ppo.py
+python train_ppo.py
 ```
 
 Or for GAT training:
 
 ```bash
-python treinamento_ppo_gat.py
+python train_ppo_gat.py
 ```
 
 The resulting model is automatically saved to the modelos_pre_treinados/ directory.
@@ -104,7 +104,7 @@ The resulting model is automatically saved to the modelos_pre_treinados/ directo
 To run validation on a fixed network configuration from the generated validation dataset (using a specific instance ID like 0 for reproducibility):
 
 ```bash
-python validacao_agente.py
+python validate_agent.py
 ```
 
 ---
