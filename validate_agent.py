@@ -2,7 +2,7 @@
 
 import os
 from stable_baselines3 import PPO
-from ambiente_mesh import AmbienteInjecaoFalhas, load_env
+from mesh_environment import FaultInjectionEnvironment, load_env
 
 def main():
     """Função principal para executar o fluxo de simulação e validação do agente."""
@@ -25,7 +25,7 @@ def main():
     print("======================================================")
 
     instances_path = "instances/val_20.csv"
-    env = AmbienteInjecaoFalhas(num_nodes=NUM_NODES, use_ns3=USE_NS3, ns3_path=NS3_PATH, instances_path=instances_path)
+    env = FaultInjectionEnvironment(num_nodes=NUM_NODES, use_ns3=USE_NS3, ns3_path=NS3_PATH, instances_path=instances_path)
 
     model_path = "modelos_pre_treinados/escala_50_ppo_mlp_ns3" if USE_NS3 else "modelos_pre_treinados/baseline_ppo_mlp"
 

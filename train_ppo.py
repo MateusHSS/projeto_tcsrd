@@ -5,7 +5,7 @@ import gymnasium as gym
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import SubprocVecEnv
-from ambiente_mesh import AmbienteInjecaoFalhas, load_env
+from mesh_environment import FaultInjectionEnvironment, load_env
 
 def main():
     """Função principal para executar o fluxo de treinamento PPO MLP."""
@@ -30,7 +30,7 @@ def main():
     instances_path = "instances/train_50.csv"
 
     env = make_vec_env(
-        lambda: AmbienteInjecaoFalhas(
+        lambda: FaultInjectionEnvironment(
             num_nodes=NUM_NODES,
             use_ns3=USE_NS3,
             ns3_path=NS3_PATH,

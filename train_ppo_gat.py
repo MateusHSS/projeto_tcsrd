@@ -4,8 +4,8 @@ import os
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import SubprocVecEnv
-from ambiente_mesh import AmbienteInjecaoFalhas, load_env
-from extrator_gat import ExtratorFeaturesGAT
+from mesh_environment import FaultInjectionEnvironment, load_env
+from gat_extractor import GATFeaturesExtractor
 
 def main():
     """Função principal para executar o fluxo de treinamento PPO GAT."""
@@ -31,7 +31,7 @@ def main():
     instances_path = "instances/train_50.csv"
 
     env = make_vec_env(
-        lambda: AmbienteInjecaoFalhas(
+        lambda: FaultInjectionEnvironment(
             num_nodes=NUM_NODES,
             use_ns3=USE_NS3,
             ns3_path=NS3_PATH,
@@ -43,8 +43,8 @@ def main():
 
     print("2. Configurando a Arquitetura Híbrida (GAT + PPO)...")
     policy_kwargs = dict(
-        features_extractor_class=ExtratorFeaturesGAT,
-        features_extractor_kwargs=dict(features_dim=256, num_nos=NUM_NODES),
+        features_extractor_class=GATFeaturesExtractor,
+        features_extractor_kwargs=dict(features_dim=256, num_nodes=NUM_NODES),
     )
 
     baseline_path = "modelos_pre_treinados/escala_50_ppo_gat.zip"

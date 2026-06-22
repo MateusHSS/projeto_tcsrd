@@ -25,7 +25,7 @@ def load_env():
                     config[chave.strip()] = valor.strip()
     return config
 
-class AmbienteInjecaoFalhas(gym.Env):
+class FaultInjectionEnvironment(gym.Env):
     """Ambiente de simulação de injeção de falhas em redes Mesh para aprendizado por reforço.
     
     Suporta simulações via NetworkX ou físicas usando o simulador NS-3.
@@ -39,7 +39,7 @@ class AmbienteInjecaoFalhas(gym.Env):
             ns3_path (str, optional): Caminho do diretório de instalação do NS-3.
             instances_path (str, optional): Caminho do CSV de instâncias de rede pré-geradas.
         """
-        super(AmbienteInjecaoFalhas, self).__init__()
+        super(FaultInjectionEnvironment, self).__init__()
         self.num_nodes = num_nodes
 
         env_config = load_env()

@@ -31,8 +31,8 @@ Unlike traditional approaches that only check if the network partitioned, this e
 ## Repository Structure
 
 ```text
-├── ambiente_mesh.py         # Gymnasium environment class (supports NetworkX and NS-3)
-├── extrator_gat.py          # Feature extractor using Graph Attention Networks (GAT)
+├── mesh_environment.py      # Gymnasium environment class (supports NetworkX and NS-3)
+├── gat_extractor.py         # Feature extractor using Graph Attention Networks (GAT)
 ├── instance_generator.py    # Parameterized script to generate fixed network topologies
 ├── mesh_simulation.cc       # Physical C++ simulation script for NS-3
 ├── train_ppo.py             # Training and fine-tuning script using MLP policies
