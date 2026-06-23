@@ -31,6 +31,7 @@ Unlike traditional approaches that only check if the network partitioned, this e
 ## Repository Structure
 
 ```text
+├── benchmark.py             # Benchmark execution script comparing models and random baseline
 ├── mesh_environment.py      # Gymnasium environment class (supports NetworkX and NS-3)
 ├── gat_extractor.py         # Feature extractor using Graph Attention Networks (GAT)
 ├── instance_generator.py    # Parameterized script to generate fixed network topologies
@@ -40,7 +41,9 @@ Unlike traditional approaches that only check if the network partitioned, this e
 ├── validate_agent.py        # Validation script to load trained agents and run tests
 ├── instances/               # Folder containing generated network topologies (CSV)
 │   ├── train_50.csv        # Fixed training topology instances (50 nodes)
-│   └── val_20.csv           # Fixed validation topology instances (20 nodes)
+│   ├── val_20.csv           # Fixed validation topology instances (20 nodes)
+│   ├── benchmark_50.csv     # Benchmark topology instances (50 nodes)
+│   └── benchmark_results.csv # Detailed benchmark outputs
 ├── modelos_pre_treinados/   # Directory containing pre-trained model checkpoints
 │   ├── baseline_ppo_mlp.zip      # MLP policy trained on NetworkX
 │   ├── escala_50_ppo_mlp.zip     # MLP policy for 50-node scale
@@ -106,6 +109,26 @@ To run validation on a fixed network configuration from the generated validation
 ```bash
 python validate_agent.py
 ```
+
+5. Benchmarking
+
+To run the benchmarking suite comparing the trained RL models against the random node-failure attack baseline:
+
+```bash
+# Run benchmark on 50-node instances using fast NetworkX simulation
+python benchmark.py --num_nodes 50 --instances instances/benchmark_50.csv --use_ns3 False
+
+# Run benchmark on 50-node instances using physical NS-3 simulation
+python benchmark.py --num_nodes 50 --instances instances/benchmark_50.csv --use_ns3 True
+```
+
+The options available are:
+* --num_nodes: Number of nodes in the network topology (default is 50).
+* --instances: Path to the topology CSV file.
+* --use_ns3: Override the USE_NS3 configuration from the .env file.
+* --runs_random: Number of runs for the random baseline to average results (default is 5).
+* --output: Path to the output CSV file to write results (default is instances/benchmark_results.csv).
+* --seed: Random seed for reproducibility (default is 42).
 
 ---
 

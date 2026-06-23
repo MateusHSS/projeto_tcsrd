@@ -96,6 +96,14 @@ class FaultInjectionEnvironment(gym.Env):
         self.instances = None
         if self.instances_path:
             self.instances = self._load_instances_csv(self.instances_path)
+            if self.instances:
+                first_inst_id = list(self.instances.keys())[0]
+                num_nodes_in_file = len(self.instances[first_inst_id])
+                if num_nodes_in_file != self.num_nodes:
+                    raise ValueError(
+                        f"Incompatibilidade de tamanho de rede: o ambiente foi configurado para {self.num_nodes} nós, "
+                        f"mas o arquivo '{self.instances_path}' contém instâncias com {num_nodes_in_file} nós."
+                    )
 
     def _load_instances_csv(self, csv_path):
         """Carrega as instâncias de topologia Mesh a partir de um arquivo CSV.
@@ -190,7 +198,8 @@ class FaultInjectionEnvironment(gym.Env):
                 cwd=self.ns3_path,
                 capture_output=True,
                 text=True,
-                check=True
+                check=True,
+                timeout=60.0
             )
 
             linhas = resultado.stdout.strip().split("\n")
@@ -205,6 +214,9 @@ class FaultInjectionEnvironment(gym.Env):
 
             return json.loads(json_str)
 
+        except subprocess.TimeoutExpired as e:
+            print(f"[NS3-Bridge] Tempo limite atingido (timeout) ao executar o simulador NS-3: {e}")
+            return {"pdr": 0.0, "avg_delay": 9.99, "tx_packets": 0, "rx_packets": 0}
         except (subprocess.CalledProcessError, ValueError) as e:
             print(f"[NS3-Bridge] Falha na execução do simulador: {e}")
             return {"pdr": 0.0, "avg_delay": 9.99, "tx_packets": 0, "rx_packets": 0}
@@ -369,7 +381,7 @@ class FaultInjectionEnvironment(gym.Env):
                     aumento_latencia = latencia_atual - self.original_latency
                     perda_redundancia = self.original_redundancy - redundancia_atual
 
-                    recompensa = (aumento_latencia * 5.0) + (perda_redundancy * 2.0) - 1.0
+                    recompensa = (aumento_latencia * 5.0) + (perda_redundancia * 2.0) - 1.0
                     info['propriedade_violada'] = "Nenhuma (Ataque em andamento)"
 
         return self._get_observation(), recompensa, terminou, truncou, info
