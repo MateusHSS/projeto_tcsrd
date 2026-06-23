@@ -4,17 +4,22 @@ import os
 from stable_baselines3 import PPO
 from mesh_environment import FaultInjectionEnvironment, load_env
 
+
 def main():
     """Função principal para executar o fluxo de simulação e validação do agente."""
     env_config = load_env()
     USE_NS3 = env_config.get("USE_NS3", "False").lower() in ("true", "1", "yes")
     NS3_PATH = env_config.get("NS3_PATH")
-    
+
     if USE_NS3:
         if not NS3_PATH or NS3_PATH == "/home/user/ns-3.48":
-            raise ValueError("NS3_PATH must be explicitly configured in the environment or .env file when USE_NS3=True.")
+            raise ValueError(
+                "NS3_PATH must be explicitly configured in the environment or .env file when USE_NS3=True."
+            )
         if not os.path.exists(NS3_PATH):
-            raise FileNotFoundError(f"The specified NS3_PATH does not exist: {NS3_PATH}")
+            raise FileNotFoundError(
+                f"The specified NS3_PATH does not exist: {NS3_PATH}"
+            )
     else:
         NS3_PATH = NS3_PATH or "/home/user/ns-3.48"
 
@@ -25,14 +30,25 @@ def main():
     print("======================================================")
 
     instances_path = "instances/val_20.csv"
-    env = FaultInjectionEnvironment(num_nodes=NUM_NODES, use_ns3=USE_NS3, ns3_path=NS3_PATH, instances_path=instances_path)
+    env = FaultInjectionEnvironment(
+        num_nodes=NUM_NODES,
+        use_ns3=USE_NS3,
+        ns3_path=NS3_PATH,
+        instances_path=instances_path,
+    )
 
-    model_path = "modelos_pre_treinados/escala_50_ppo_mlp_ns3" if USE_NS3 else "modelos_pre_treinados/baseline_ppo_mlp"
+    model_path = (
+        "modelos_pre_treinados/escala_50_ppo_mlp_ns3"
+        if USE_NS3
+        else "modelos_pre_treinados/baseline_ppo_mlp"
+    )
 
     try:
         model = PPO.load(model_path)
     except Exception:
-        print(f"[Aviso] Modelo {model_path} não encontrado. Tentando baseline_ppo_mlp...")
+        print(
+            f"[Aviso] Modelo {model_path} não encontrado. Tentando baseline_ppo_mlp..."
+        )
         model = PPO.load("modelos_pre_treinados/baseline_ppo_mlp.zip")
 
     print("[OK] Modelo carregado com sucesso!\n")
@@ -55,10 +71,14 @@ def main():
         obs, reward, terminated, truncated, info = env.step(action)
         total_reward += reward
 
-        print(f"Passo {step_count:02d} | IA atacou o Nó {action:02d} | Recompensa: {reward:6.2f}")
+        print(
+            f"Passo {step_count:02d} | IA atacou o Nó {action:02d} | Recompensa: {reward:6.2f}"
+        )
 
         if terminated:
-            failure_reason = info.get('propriedade_violada', 'Erro: Motivo não registrado.')
+            failure_reason = info.get(
+                "propriedade_violada", "Erro: Motivo não registrado."
+            )
 
         episode_terminated = terminated or truncated
 
@@ -75,5 +95,7 @@ def main():
     print(f"Recompensa Acumulada         : {total_reward:.2f}")
     print("======================================================")
 
+
 if __name__ == "__main__":
     main()
+

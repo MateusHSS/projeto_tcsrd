@@ -7,6 +7,7 @@ import subprocess
 import json
 import shutil
 
+
 def load_env():
     """Lê variáveis de configuração do arquivo .env.
 
@@ -25,11 +26,13 @@ def load_env():
                     config[chave.strip()] = valor.strip()
     return config
 
+
 class FaultInjectionEnvironment(gym.Env):
     """Ambiente de simulação de injeção de falhas em redes Mesh para aprendizado por reforço.
-    
+
     Suporta simulações via NetworkX ou físicas usando o simulador NS-3.
     """
+
     def __init__(self, num_nodes=20, use_ns3=None, ns3_path=None, instances_path=None):
         """Inicializa o ambiente de injeção de falhas.
 
@@ -43,9 +46,13 @@ class FaultInjectionEnvironment(gym.Env):
         self.num_nodes = num_nodes
 
         env_config = load_env()
-        
+
         if use_ns3 is None:
-            self.use_ns3 = env_config.get("USE_NS3", "False").lower() in ("true", "1", "yes")
+            self.use_ns3 = env_config.get("USE_NS3", "False").lower() in (
+                "true",
+                "1",
+                "yes",
+            )
         else:
             self.use_ns3 = use_ns3
 
@@ -56,10 +63,14 @@ class FaultInjectionEnvironment(gym.Env):
                 self.ns3_path = ns3_path
 
             if not self.ns3_path or self.ns3_path == "/home/user/ns-3.48":
-                raise ValueError("NS3_PATH must be explicitly configured in the environment or .env file when use_ns3=True.")
-            
+                raise ValueError(
+                    "NS3_PATH must be explicitly configured in the environment or .env file when use_ns3=True."
+                )
+
             if not os.path.exists(self.ns3_path):
-                raise FileNotFoundError(f"The specified NS3_PATH does not exist: {self.ns3_path}")
+                raise FileNotFoundError(
+                    f"The specified NS3_PATH does not exist: {self.ns3_path}"
+                )
         else:
             self.ns3_path = ns3_path or env_config.get("NS3_PATH", "/home/user/ns-3.48")
 
@@ -78,10 +89,7 @@ class FaultInjectionEnvironment(gym.Env):
 
         self.action_space = gym.spaces.Discrete(self.num_nodes)
         self.observation_space = gym.spaces.Box(
-            low=0.0,
-            high=1.0,
-            shape=(self.num_nodes * 3,),
-            dtype=np.float32
+            low=0.0, high=1.0, shape=(self.num_nodes * 3,), dtype=np.float32
         )
 
         self.graph_ptr = None
@@ -115,33 +123,42 @@ class FaultInjectionEnvironment(gym.Env):
             dict: Dicionário mapeando IDs de instâncias para seus respectivos nós e conexões.
         """
         import csv
+
         instances = {}
         if not os.path.exists(csv_path):
-            raise FileNotFoundError(f"Arquivo de instâncias não encontrado em: {csv_path}")
-            
-        with open(csv_path, mode='r', encoding='utf-8') as f:
+            raise FileNotFoundError(
+                f"Arquivo de instâncias não encontrado em: {csv_path}"
+            )
+
+        with open(csv_path, mode="r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
             for row in reader:
-                inst_id = int(row['instance_id'])
-                node_id = int(row['node_id'])
-                x = float(row['x'])
-                y = float(row['y'])
-                cpu = float(row['cpu'])
-                memory = float(row['memory'])
-                
-                neighbors_str = row['neighbors'].strip()
-                neighbors = [int(n) for n in neighbors_str.split(';') if n.strip()] if neighbors_str else []
-                
+                inst_id = int(row["instance_id"])
+                node_id = int(row["node_id"])
+                x = float(row["x"])
+                y = float(row["y"])
+                cpu = float(row["cpu"])
+                memory = float(row["memory"])
+
+                neighbors_str = row["neighbors"].strip()
+                neighbors = (
+                    [int(n) for n in neighbors_str.split(";") if n.strip()]
+                    if neighbors_str
+                    else []
+                )
+
                 if inst_id not in instances:
                     instances[inst_id] = []
-                instances[inst_id].append({
-                    'node_id': node_id,
-                    'x': x,
-                    'y': y,
-                    'cpu': cpu,
-                    'memory': memory,
-                    'neighbors': neighbors
-                })
+                instances[inst_id].append(
+                    {
+                        "node_id": node_id,
+                        "x": x,
+                        "y": y,
+                        "cpu": cpu,
+                        "memory": memory,
+                        "neighbors": neighbors,
+                    }
+                )
         return instances
 
     def _copy_simulation_script(self):
@@ -151,7 +168,9 @@ class FaultInjectionEnvironment(gym.Env):
         dest_cc = os.path.join(self.ns3_path, "scratch", "mesh_simulation.cc")
 
         if os.path.exists(src_cc):
-            if not os.path.exists(dest_cc) or os.path.getmtime(src_cc) > os.path.getmtime(dest_cc):
+            if not os.path.exists(dest_cc) or os.path.getmtime(
+                src_cc
+            ) > os.path.getmtime(dest_cc):
                 print(f"[NS3-Bridge] Copiando {src_cc} para {dest_cc}...")
                 os.makedirs(os.path.dirname(dest_cc), exist_ok=True)
                 shutil.copy(src_cc, dest_cc)
@@ -164,15 +183,17 @@ class FaultInjectionEnvironment(gym.Env):
         Returns:
             dict: Métricas de PDR, atraso médio e contagem de pacotes.
         """
-        failed_nodes_str = ",".join(map(str, self.failed_nodes)) if self.failed_nodes else "none"
-        
-        cpus = [self.G.nodes[i]['features'][0] for i in range(self.num_nodes)]
-        mems = [self.G.nodes[i]['features'][1] for i in range(self.num_nodes)]
-        
+        failed_nodes_str = (
+            ",".join(map(str, self.failed_nodes)) if self.failed_nodes else "none"
+        )
+
+        cpus = [self.G.nodes[i]["features"][0] for i in range(self.num_nodes)]
+        mems = [self.G.nodes[i]["features"][1] for i in range(self.num_nodes)]
+
         cpu_str = ",".join(f"{c:.4f}" for c in cpus)
         mem_str = ",".join(f"{m:.4f}" for m in mems)
 
-        pos = nx.get_node_attributes(self.G, 'pos')
+        pos = nx.get_node_attributes(self.G, "pos")
         posicoes_lista = []
         for i in range(self.num_nodes):
             x, y = pos[i]
@@ -182,14 +203,16 @@ class FaultInjectionEnvironment(gym.Env):
         range_fisico = self.communication_radius * 500.0
 
         comando = [
-            "./ns3", "run", "scratch/mesh_simulation",
+            "./ns3",
+            "run",
+            "scratch/mesh_simulation",
             "--",
             f"--numNodes={self.num_nodes}",
             f"--failedNodes={failed_nodes_str}",
             f"--cpuValues={cpu_str}",
             f"--memValues={mem_str}",
             f"--nodePositions={pos_str}",
-            f"--range={range_fisico}"
+            f"--range={range_fisico}",
         ]
 
         try:
@@ -199,7 +222,7 @@ class FaultInjectionEnvironment(gym.Env):
                 capture_output=True,
                 text=True,
                 check=True,
-                timeout=60.0
+                timeout=60.0,
             )
 
             linhas = resultado.stdout.strip().split("\n")
@@ -210,12 +233,16 @@ class FaultInjectionEnvironment(gym.Env):
                     break
 
             if not json_str:
-                raise ValueError(f"NS-3 não retornou JSON válido. Stdout:\n{resultado.stdout}")
+                raise ValueError(
+                    f"NS-3 não retornou JSON válido. Stdout:\n{resultado.stdout}"
+                )
 
             return json.loads(json_str)
 
         except subprocess.TimeoutExpired as e:
-            print(f"[NS3-Bridge] Tempo limite atingido (timeout) ao executar o simulador NS-3: {e}")
+            print(
+                f"[NS3-Bridge] Tempo limite atingido (timeout) ao executar o simulador NS-3: {e}"
+            )
             return {"pdr": 0.0, "avg_delay": 9.99, "tx_packets": 0, "rx_packets": 0}
         except (subprocess.CalledProcessError, ValueError) as e:
             print(f"[NS3-Bridge] Falha na execução do simulador: {e}")
@@ -237,38 +264,40 @@ class FaultInjectionEnvironment(gym.Env):
 
         if self.instances:
             inst_id = None
-            if options and 'instancia_id' in options:
-                inst_id = options['instancia_id']
+            if options and "instancia_id" in options:
+                inst_id = options["instancia_id"]
             else:
                 inst_id = int(self.np_random.choice(list(self.instances.keys())))
-                
+
             nos_dados = self.instances[inst_id]
             self.G = nx.Graph()
-            
+
             for nd in nos_dados:
-                node_id = nd['node_id']
+                node_id = nd["node_id"]
                 self.G.add_node(
-                    node_id, 
-                    status=1.0, 
-                    features=[nd['cpu'], nd['memory']], 
-                    pos=(nd['x'], nd['y'])
+                    node_id,
+                    status=1.0,
+                    features=[nd["cpu"], nd["memory"]],
+                    pos=(nd["x"], nd["y"]),
                 )
-                
+
             for nd in nos_dados:
-                node_id = nd['node_id']
-                for vizinho in nd['neighbors']:
+                node_id = nd["node_id"]
+                for vizinho in nd["neighbors"]:
                     self.G.add_edge(node_id, vizinho)
         else:
             while True:
-                self.G = nx.random_geometric_graph(self.num_nodes, radius=self.communication_radius)
+                self.G = nx.random_geometric_graph(
+                    self.num_nodes, radius=self.communication_radius
+                )
                 if nx.is_connected(self.G):
                     break
 
             for node in self.G.nodes():
-                self.G.nodes[node]['status'] = 1.0
-                self.G.nodes[node]['features'] = [
+                self.G.nodes[node]["status"] = 1.0
+                self.G.nodes[node]["features"] = [
                     self.np_random.uniform(0.1, 0.9),
-                    self.np_random.uniform(0.2, 0.8)
+                    self.np_random.uniform(0.2, 0.8),
                 ]
 
         if self.use_ns3:
@@ -295,8 +324,8 @@ class FaultInjectionEnvironment(gym.Env):
         """
         obs = []
         for i in range(self.num_nodes):
-            status = self.G.nodes[i]['status']
-            cpu, mem = self.G.nodes[i]['features']
+            status = self.G.nodes[i]["status"]
+            cpu, mem = self.G.nodes[i]["features"]
             obs.extend([status, cpu, mem])
         return np.array(obs, dtype=np.float32)
 
@@ -317,11 +346,11 @@ class FaultInjectionEnvironment(gym.Env):
         if self.steps_taken >= self.step_limit:
             truncou = True
 
-        if self.G.nodes[action]['status'] == 0.0:
+        if self.G.nodes[action]["status"] == 0.0:
             recompensa = -5.0
             return self._get_observation(), recompensa, terminou, truncou, {}
 
-        self.G.nodes[action]['status'] = 0.0
+        self.G.nodes[action]["status"] = 0.0
 
         if self.use_ns3:
             self.failed_nodes.add(action)
@@ -338,25 +367,31 @@ class FaultInjectionEnvironment(gym.Env):
             if pdr_atual <= (self.original_pdr * 0.1):
                 recompensa = +100.0
                 terminou = True
-                info['propriedade_violada'] = f"Liveness (PDR colapsou para {pdr_atual:.2f}%. Original: {self.original_pdr:.2f}%)"
-            
+                info["propriedade_violada"] = (
+                    f"Liveness (PDR colapsou para {pdr_atual:.2f}%. Original: {self.original_pdr:.2f}%)"
+                )
+
             elif delay_atual >= (self.original_delay * 1.5):
                 recompensa = +100.0
                 terminou = True
-                info['propriedade_violada'] = f"Safety (Atraso médio aumentou 50%+. Original: {self.original_delay*1000:.2f}ms | Atual: {delay_atual*1000:.2f}ms)"
-            
+                info["propriedade_violada"] = (
+                    f"Safety (Atraso médio aumentou 50%+. Original: {self.original_delay * 1000:.2f}ms | Atual: {delay_atual * 1000:.2f}ms)"
+                )
+
             else:
                 aumento_delay = delay_atual - self.original_delay
                 aumento_delay_ms = aumento_delay * 1000.0
                 perda_pdr = self.original_pdr - pdr_atual
 
-                recompensa = (aumento_delay_ms * 5.0) + ((perda_pdr / 100.0) * 10.0) - 1.0
-                info['propriedade_violada'] = "Nenhuma (Ataque em andamento)"
+                recompensa = (
+                    (aumento_delay_ms * 5.0) + ((perda_pdr / 100.0) * 10.0) - 1.0
+                )
+                info["propriedade_violada"] = "Nenhuma (Ataque em andamento)"
         else:
             arestas_para_remover = list(self.G.edges(action))
             self.G.remove_edges_from(arestas_para_remover)
 
-            nos_vivos = [n for n in self.G.nodes() if self.G.nodes[n]['status'] == 1.0]
+            nos_vivos = [n for n in self.G.nodes() if self.G.nodes[n]["status"] == 1.0]
             subgrafo = self.G.subgraph(nos_vivos)
 
             info = {}
@@ -364,7 +399,9 @@ class FaultInjectionEnvironment(gym.Env):
             if not nx.is_connected(subgrafo):
                 recompensa = +100.0
                 terminou = True
-                info['propriedade_violada'] = "Liveness (Conectividade Rompida - Rede Particionada)"
+                info["propriedade_violada"] = (
+                    "Liveness (Conectividade Rompida - Rede Particionada)"
+                )
             else:
                 latencia_atual = nx.average_shortest_path_length(subgrafo)
 
@@ -376,12 +413,16 @@ class FaultInjectionEnvironment(gym.Env):
                 if latencia_atual >= (self.original_latency * 1.5):
                     recompensa = +100.0
                     terminou = True
-                    info['propriedade_violada'] = f"Safety (Latência aumentou 50%+. Original: {self.original_latency:.2f} | Atual: {latencia_atual:.2f})"
+                    info["propriedade_violada"] = (
+                        f"Safety (Latência aumentou 50%+. Original: {self.original_latency:.2f} | Atual: {latencia_atual:.2f})"
+                    )
                 else:
                     aumento_latencia = latencia_atual - self.original_latency
                     perda_redundancia = self.original_redundancy - redundancia_atual
 
-                    recompensa = (aumento_latencia * 5.0) + (perda_redundancia * 2.0) - 1.0
-                    info['propriedade_violada'] = "Nenhuma (Ataque em andamento)"
+                    recompensa = (
+                        (aumento_latencia * 5.0) + (perda_redundancia * 2.0) - 1.0
+                    )
+                    info["propriedade_violada"] = "Nenhuma (Ataque em andamento)"
 
         return self._get_observation(), recompensa, terminou, truncou, info

@@ -7,17 +7,22 @@ from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import SubprocVecEnv
 from mesh_environment import FaultInjectionEnvironment, load_env
 
+
 def main():
     """Função principal para executar o fluxo de treinamento PPO MLP."""
     env_config = load_env()
     USE_NS3 = env_config.get("USE_NS3", "False").lower() in ("true", "1", "yes")
     NS3_PATH = env_config.get("NS3_PATH")
-    
+
     if USE_NS3:
         if not NS3_PATH or NS3_PATH == "/home/user/ns-3.48":
-            raise ValueError("NS3_PATH must be explicitly configured in the environment or .env file when USE_NS3=True.")
+            raise ValueError(
+                "NS3_PATH must be explicitly configured in the environment or .env file when USE_NS3=True."
+            )
         if not os.path.exists(NS3_PATH):
-            raise FileNotFoundError(f"The specified NS3_PATH does not exist: {NS3_PATH}")
+            raise FileNotFoundError(
+                f"The specified NS3_PATH does not exist: {NS3_PATH}"
+            )
     else:
         NS3_PATH = NS3_PATH or "/home/user/ns-3.48"
 
@@ -79,6 +84,7 @@ def main():
     )
     ppo_model.save(save_name)
     print(f"[OK] Modelo salvo com sucesso em '{save_name}.zip'")
+
 
 if __name__ == "__main__":
     main()

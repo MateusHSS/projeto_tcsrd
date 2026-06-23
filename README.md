@@ -40,10 +40,10 @@ Unlike traditional approaches that only check if the network partitioned, this e
 ├── train_ppo_gat.py         # Training and fine-tuning script using GAT policies
 ├── validate_agent.py        # Validation script to load trained agents and run tests
 ├── instances/               # Folder containing generated network topologies (CSV)
-│   ├── train_50.csv        # Fixed training topology instances (50 nodes)
-│   ├── val_20.csv           # Fixed validation topology instances (20 nodes)
-│   ├── benchmark_50.csv     # Benchmark topology instances (50 nodes)
-│   └── benchmark_results.csv # Detailed benchmark outputs
+│   ├── train_50.csv              # Fixed training topology instances (50 nodes)
+│   ├── val_20.csv                # Fixed validation topology instances (20 nodes)
+│   └── benchmark_50.csv          # Benchmark topology instances (50 nodes)
+├── benchmark_results.csv    # Detailed benchmark outputs
 ├── modelos_pre_treinados/   # Directory containing pre-trained model checkpoints
 │   ├── baseline_ppo_mlp.zip      # MLP policy trained on NetworkX
 │   ├── escala_50_ppo_mlp.zip     # MLP policy for 50-node scale
@@ -127,7 +127,7 @@ The options available are:
 * --instances: Path to the topology CSV file.
 * --use_ns3: Override the USE_NS3 configuration from the .env file.
 * --runs_random: Number of runs for the random baseline to average results (default is 5).
-* --output: Path to the output CSV file to write results (default is instances/benchmark_results.csv).
+* --output: Path to the output CSV file to write results (default is ./benchmark_results.csv).
 * --seed: Random seed for reproducibility (default is 42).
 
 ---
