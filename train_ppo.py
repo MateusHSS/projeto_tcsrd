@@ -29,9 +29,7 @@ def main():
     NUM_NODES = 50
     TOTAL_STEPS = 5000 if USE_NS3 else 200000
 
-    print(f"1. Instanciando os Ambientes Paralelos (Modo NS-3: {USE_NS3})...")
-
-    num_envs = 2 if USE_NS3 else 4
+    num_envs = 1 if USE_NS3 else 4
     instances_path = "instances/train_50.csv"
 
     env = make_vec_env(
@@ -49,7 +47,7 @@ def main():
 
     if USE_NS3 and os.path.exists(baseline_path):
         print(
-            f"2. [Transfer Learning] Carregando cérebro pré-treinado no NetworkX para calibrar no NS-3: {baseline_path}"
+            f"2. [Transfer Learning] Carregando modelo pré-treinado no NetworkX para calibrar no NS-3: {baseline_path}"
         )
         ppo_model = PPO.load(
             baseline_path,
@@ -58,7 +56,7 @@ def main():
             tensorboard_log="./escala_50_ppo_mlp_ns3/",
         )
     else:
-        print("2. Criando o Agente PPO do zero (Baseline)...")
+        print("2. Criando o Agente PPO do zero...")
         ppo_model = PPO(
             "MlpPolicy",
             env,
@@ -72,7 +70,7 @@ def main():
             device="cpu",
         )
 
-    print(f"3. Iniciando o Treinamento Profundo ({TOTAL_STEPS} passos)...")
+    print(f"3. Iniciando o Treinamento ({TOTAL_STEPS} passos)...")
     ppo_model.learn(total_timesteps=TOTAL_STEPS, progress_bar=True)
 
     print("4. Treinamento Concluído!")
@@ -83,7 +81,8 @@ def main():
         else "modelos_pre_treinados/escala_50_ppo_mlp"
     )
     ppo_model.save(save_name)
-    print(f"[OK] Modelo salvo com sucesso em '{save_name}.zip'")
+    print(f"[OK] Modelo salvo:'{save_name}.zip'")
+    env.close()
 
 
 if __name__ == "__main__":

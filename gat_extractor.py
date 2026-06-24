@@ -51,23 +51,16 @@ class ExtratorFeaturesGAT(BaseFeaturesExtractor):
 
         for i in range(batch_size):
             x_nos = observations[i].view(self.num_nos, self.num_features_no)
-            indices_vivos = (x_nos[:, 0] == 1.0).nonzero(as_tuple=True)[0]
+            indices_vivos = (x_nos[:, 0] == 1.0).nonzero(as_tuple=False).squeeze(-1)
 
-            arestas_origem, arestas_destino = [], []
-            for u in indices_vivos:
-                for v in indices_vivos:
-                    if u != v:
-                        arestas_origem.append(u.item())
-                        arestas_destino.append(v.item())
-
-            if len(arestas_origem) == 0:
-                edge_index = torch.zeros((2, 1), dtype=torch.long, device=dispositivo)
+            if indices_vivos.numel() > 1:
+                u, v = torch.meshgrid(indices_vivos, indices_vivos, indexing="ij")
+                u = u.flatten()
+                v = v.flatten()
+                mask = u != v
+                edge_index = torch.stack([u[mask], v[mask]], dim=0)
             else:
-                edge_index = torch.tensor(
-                    [arestas_origem, arestas_destino],
-                    dtype=torch.long,
-                    device=dispositivo,
-                )
+                edge_index = torch.zeros((2, 1), dtype=torch.long, device=dispositivo)
 
             lista_grafos.append(Data(x=x_nos, edge_index=edge_index))
 

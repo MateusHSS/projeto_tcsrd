@@ -5,7 +5,10 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import SubprocVecEnv
 from mesh_environment import FaultInjectionEnvironment, load_env
-from gat_extractor import GATFeaturesExtractor
+from gat_extractor import ExtratorFeaturesGAT
+import gat_extractor
+import sys
+sys.modules['extrator_gat'] = gat_extractor
 
 
 def main():
@@ -29,10 +32,9 @@ def main():
     NUM_NODES = 50
     TOTAL_STEPS = 5000 if USE_NS3 else 200000
 
-    print(
-        f"1. Instanciando os Ambientes Paralelos de Treinamento (Modo NS-3: {USE_NS3})..."
-    )
-    num_envs = 2 if USE_NS3 else 4
+    print(f"1. Instanciando os Ambientes Paralelos de Treinamento (Modo NS-3: {USE_NS3})...")
+
+    num_envs = 1 if USE_NS3 else 4
     instances_path = "instances/train_50.csv"
 
     env = make_vec_env(
@@ -47,16 +49,17 @@ def main():
     )
 
     print("2. Configurando a Arquitetura Híbrida (GAT + PPO)...")
+    
     policy_kwargs = dict(
-        features_extractor_class=GATFeaturesExtractor,
-        features_extractor_kwargs=dict(features_dim=256, num_nodes=NUM_NODES),
+        features_extractor_class=ExtratorFeaturesGAT,
+        features_extractor_kwargs=dict(features_dim=256, num_nos=NUM_NODES),
     )
 
     baseline_path = "modelos_pre_treinados/escala_50_ppo_gat.zip"
 
     if USE_NS3 and os.path.exists(baseline_path):
         print(
-            f"2. [Transfer Learning] Carregando cérebro GAT pré-treinado no NetworkX para calibrar no NS-3: {baseline_path}"
+            f"2. [Transfer Learning] Carregando GAT pré-treinado no NetworkX para calibrar no NS-3: {baseline_path}"
         )
         ppo_gat_model = PPO.load(
             baseline_path,
@@ -70,9 +73,11 @@ def main():
             env,
             policy_kwargs=policy_kwargs,
             verbose=1,
-            learning_rate=0.0003,
-            n_steps=1024,
-            ent_coef=0.01,
+            learning_rate=4.446778882320581e-05,
+            n_steps=2048,
+            ent_coef=0.008362026818168191,
+            gamma=0.95,
+            clip_range=0.2,
             tensorboard_log=(
                 "./escala_50_ppo_gat_ns3/" if USE_NS3 else "./escala_50_ppo_gat/"
             ),
@@ -84,7 +89,7 @@ def main():
     )
     ppo_gat_model.learn(total_timesteps=TOTAL_STEPS, progress_bar=True)
 
-    print("4. Treinamento Concluído! Salvando o Framework Proposto...")
+    print("4. Treinamento Concluído! Salvando...")
 
     save_name = (
         "modelos_pre_treinados/escala_50_ppo_gat_ns3"
@@ -93,7 +98,8 @@ def main():
     )
     ppo_gat_model.save(save_name)
 
-    print(f"[OK] Modelo definitivo salvo com sucesso em '{save_name}.zip'")
+    print(f"[OK] Modelo salvo com sucesso: '{save_name}.zip'")
+    env.close()
 
 
 if __name__ == "__main__":

@@ -25,10 +25,6 @@ def main():
 
     NUM_NODES = 20
 
-    print("======================================================")
-    print(f" CARREGANDO A IA TREINADA (Modo NS-3: {USE_NS3})")
-    print("======================================================")
-
     instances_path = "instances/val_20.csv"
     env = FaultInjectionEnvironment(
         num_nodes=NUM_NODES,
@@ -52,10 +48,6 @@ def main():
         model = PPO.load("modelos_pre_treinados/baseline_ppo_mlp.zip")
 
     print("[OK] Modelo carregado com sucesso!\n")
-
-    print("======================================================")
-    print(" INICIANDO O ATAQUE GUIADO PELA IA")
-    print("======================================================")
 
     obs, _ = env.reset(options={"instancia_id": 0})
     episode_terminated = False
@@ -82,9 +74,8 @@ def main():
 
         episode_terminated = terminated or truncated
 
-    print("\n======================================================")
     print(" RELATÓRIO FINAL DA INJEÇÃO DE FALHAS")
-    print("======================================================")
+
     if total_reward > 0:
         print("Status: [SUCESSO DO ATAQUE]")
     else:
@@ -93,7 +84,6 @@ def main():
     print(f"Total de Ataques Necessários : {step_count}")
     print(f"Propriedade Violada          : {failure_reason}")
     print(f"Recompensa Acumulada         : {total_reward:.2f}")
-    print("======================================================")
 
 
 if __name__ == "__main__":

@@ -1,159 +1,108 @@
 # Property-Guided Fault Injection in Mesh Networks Using Reinforcement Learning
 
-This repository contains an Artificial Intelligence framework designed to evaluate the resilience of dynamic mesh networks through directed and automated attacks. The system uses Deep Reinforcement Learning (PPO) to discover complex topological vulnerabilities in graphs, assessing key communication properties beyond basic connectivity.
+This repository contains an Artificial Intelligence framework designed to evaluate the resilience of dynamic mesh networks through directed and automated attacks. The system uses a **Hybrid Deep Reinforcement Learning (DRL) architecture** with **Graph Attention Networks (GAT)** to discover complex topological vulnerabilities in graphs, assessing key communication properties beyond basic connectivity.
 
-The framework serves as the decision engine for large-scale fault injection simulations in the NS-3 discrete event simulator.
-
----
-
-## System Architecture
-
-The framework is structured using standard Python reinforcement learning libraries, using Gymnasium for environment modeling and Stable-Baselines3 for training algorithms.
-
-1. Environment (AmbienteInjecaoFalhas): Models the Mesh network as a random geometric graph using NetworkX. Each node has dynamic attributes such as activation status and internal metrics.
-2. Multi-Criteria Evaluator: For every agent action, the environment computes the real-time impact on the topology and penalizes or rewards the agent based on Service Level Agreements (SLA).
-3. Agent (PPO): A neural network that observes the current state of the mesh and decides which critical node to disable to maximize system degradation.
+The framework serves as the decision engine for large-scale fault injection simulations in the **NS-3 discrete event simulator**, utilizing a cutting-edge **Transfer Learning** approach.
 
 ---
 
-## Validated Communication Properties
+## 🧠 System Architecture
 
-Unlike traditional approaches that only check if the network partitioned, this environment calculates continuous rewards (dense rewards) based on the following metrics:
+The framework is a sophisticated hybrid ecosystem combining Graph Neural Networks and Proximal Policy Optimization (PPO), divided into four core blocks:
 
-| Property | Mathematical Metric (NetworkX) | Critical Violation Criterion |
-| :--- | :--- | :--- |
-| Liveness (Connectivity) | nx.is_connected(G) | The network partitions into two or more disconnected components. |
-| Safety (End-to-End Latency) | nx.average_shortest_path_length(G) | The average shortest path length increases by 50% or more compared to the healthy network. |
-| Multi-path Availability | nx.average_node_connectivity(G) | Measures residual redundancy (how many nodes need to fail to disconnect the network). |
+### 1. State Representation (Observation Space)
+The architecture captures the real-time network state in three matrices:
+*   **Node Features:** Node status (alive/dead), Betweenness Centrality, and Degree.
+*   **Edge Index:** The adjacency matrix dictating the physical layout.
+*   **Performance Metrics:** Real-time Latency, Packet Delivery Ratio (PDR), and Delay.
+*   **Action Masking:** A logical filter preventing the agent from attacking already offline routers, optimizing gradient flow and preventing infinite loops.
+
+### 2. Neural Backbone (Custom GAT Extractor)
+Built with `PyTorch Geometric`, this module replaces traditional flattened MLPs:
+*   **Graph Attention Layers (GATConv):** Computes dynamic mathematical attention weights for neighboring nodes, allowing the AI to autonomously learn which routers are structural bottlenecks.
+*   **Global Pooling:** Condenses the processed graph into a dense latent feature vector.
+
+### 3. The Decision Brain (PPO Actor-Critic)
+The dense vector is fed into the Proximal Policy Optimization (PPO) algorithm:
+*   **Actor Network:** Outputs a probability distribution pointing to the exact node to be attacked.
+*   **Critic Network:** Evaluates the expected reward of the chosen attack.
+
+### 4. Dual-Engine Simulator
+The environment dynamically routes the simulation to two distinct engines:
+*   **Abstract Engine (NetworkX):** High-speed mathematical graph simulator. Used to force the AI to learn structural topology massively.
+*   **Physical Engine (NS-3):** Deep C++ integration simulating Wi-Fi radio waves, OLSR/AODV routing protocols, Bit Error Rates (BER), and real packet collisions.
 
 ---
 
-## Repository Structure
+## 🚀 The Training Pipeline (Transfer Learning & Reward Shaping)
+
+To train an AI capable of destroying physical NS-3 networks efficiently, we employ a 2-phase pipeline:
+
+1. **Phase 1: Abstract Pre-Training (NetworkX)**
+   - The agent plays 200,000 steps in mathematical graphs.
+   - It learns the "theory" of latency and bottlenecks at ultra-high speeds.
+2. **Phase 2: Physical Fine-Tuning (NS-3 Transfer Learning)**
+   - The pre-trained brain is injected into the NS-3 physical simulator for 5,000 steps.
+   - **The Sparse Reward Problem:** Since physical networks are highly resilient, finding the exact sequence to break the SLA (+100 reward) is statistically improbable, causing gradient collapse if strict penalties are used.
+   - **The Solution (Reward Shaping):** We implemented a continuous reward mechanism that yields fractional points based on latency degradation, serving as "breadcrumbs" to guide the GAT surgically towards the physical bottleneck.
+
+---
+
+## 📁 Repository Structure
 
 ```text
+├── run_all.sh               # Master script: Runs the entire 4-step pipeline automatically
+├── resume_training.sh       # Recovery script: Resumes training from Phase 4 if interrupted
 ├── benchmark.py             # Benchmark execution script comparing models and random baseline
+├── plot_benchmark.py        # Generates academic Bar charts, Boxplots, and Survival Curves
+├── plot_learning_curve.py   # Generates continuous Transfer Learning evolution curves
 ├── mesh_environment.py      # Gymnasium environment class (supports NetworkX and NS-3)
 ├── gat_extractor.py         # Feature extractor using Graph Attention Networks (GAT)
 ├── instance_generator.py    # Parameterized script to generate fixed network topologies
 ├── mesh_simulation.cc       # Physical C++ simulation script for NS-3
 ├── train_ppo.py             # Training and fine-tuning script using MLP policies
 ├── train_ppo_gat.py         # Training and fine-tuning script using GAT policies
-├── validate_agent.py        # Validation script to load trained agents and run tests
 ├── instances/               # Folder containing generated network topologies (CSV)
-│   ├── train_50.csv              # Fixed training topology instances (50 nodes)
-│   ├── val_20.csv                # Fixed validation topology instances (20 nodes)
-│   └── benchmark_50.csv          # Benchmark topology instances (50 nodes)
-├── benchmark_results.csv    # Detailed benchmark outputs
 ├── modelos_pre_treinados/   # Directory containing pre-trained model checkpoints
-│   ├── baseline_ppo_mlp.zip      # MLP policy trained on NetworkX
-│   ├── escala_50_ppo_mlp.zip     # MLP policy for 50-node scale
-│   └── escala_50_ppo_gat.zip     # GAT policy for 50-node scale
 └── README.md                # System documentation
 ```
 
 ---
 
-## Switching Between NetworkX and NS-3 (.env File)
+## 🛠️ How to Run
 
-To toggle between fast mathematical simulation using NetworkX and real packet-level traffic simulation using NS-3, edit the variables in the `.env` file in the repository root:
-
-* USE_NS3: Set to True to enable NS-3 simulations, or False to use NetworkX.
-* NS3_PATH: Path to your local NS-3 installation directory (e.g., /home/username/ns-3.48).
-
-All training and validation scripts read this configuration dynamically.
-
----
-
-## How to Run
-
-1. Installation
-
+### 1. Installation
 Set up a virtual environment (Python 3.8+) and install the dependencies:
-
 ```bash
 pip install -r requirements.txt
 ```
+*(Ensure `ns-3.48` is installed in your system and properly referenced in the `.env` file).*
 
-2. Generating Fixed Network Topologies
-
-To generate reproducible datasets of network configurations, run the generator script:
-
+### 2. The One-Click Pipeline
+To execute the entire lifecycle (NetworkX Pre-training -> NS-3 Fine-tuning -> Benchmarking -> Graph Generation), simply run:
 ```bash
-# Generate 100 training instances with 50 nodes
-python instance_generator.py --num_instances 100 --num_nodes 50 --output instances/train_50.csv --seed 42
-
-# Generate 20 validation instances with 20 nodes
-python instance_generator.py --num_instances 20 --num_nodes 20 --output instances/val_20.csv --seed 100
+./run_all.sh
 ```
+*(If your system reboots midway, you can resume by running `./resume_training.sh`).*
 
-3. Training the Agent
-
-To start training the policy using the generated training dataset:
-
+### 3. Generating the Academic Plots
+After the benchmark completes, you can generate 5 high-resolution graphs ready for LaTeX/academic papers:
 ```bash
-python train_ppo.py
+# Generates Bar charts, Boxplots of Stability, and Kaplan-Meier Survival Curves
+python plot_benchmark.py
+
+# Generates the Continuous Timeline comparing MLP and GAT learning speeds
+python plot_learning_curve.py
 ```
-
-Or for GAT training:
-
-```bash
-python train_ppo_gat.py
-```
-
-The resulting model is automatically saved to the modelos_pre_treinados/ directory.
-
-4. Validation
-
-To run validation on a fixed network configuration from the generated validation dataset (using a specific instance ID like 0 for reproducibility):
-
-```bash
-python validate_agent.py
-```
-
-5. Benchmarking
-
-To run the benchmarking suite comparing the trained RL models against the random node-failure attack baseline:
-
-```bash
-# Run benchmark on 50-node instances using fast NetworkX simulation
-python benchmark.py --num_nodes 50 --instances instances/benchmark_50.csv --use_ns3 False
-
-# Run benchmark on 50-node instances using physical NS-3 simulation
-python benchmark.py --num_nodes 50 --instances instances/benchmark_50.csv --use_ns3 True
-```
-
-The options available are:
-* --num_nodes: Number of nodes in the network topology (default is 50).
-* --instances: Path to the topology CSV file.
-* --use_ns3: Override the USE_NS3 configuration from the .env file.
-* --runs_random: Number of runs for the random baseline to average results (default is 5).
-* --output: Path to the output CSV file to write results (default is ./benchmark_results.csv).
-* --seed: Random seed for reproducibility (default is 42).
 
 ---
 
-## Validation Output Example
+## 📊 Validated Communication Properties
 
-When running the validation script, the step-by-step attack decisions are displayed:
+The framework calculates dense continuous rewards based on the following SLAs:
 
-```text
-======================================================
- CARREGANDO A IA TREINADA (Modo NS-3: True)
-======================================================
-[Aviso] Modelo modelos_pre_treinados/escala_50_ppo_mlp_ns3 não encontrado. Tentando baseline_ppo_mlp...
-[OK] Modelo carregado com sucesso!
-
-======================================================
- INICIANDO O ATAQUE GUIADO PELA IA
-======================================================
-Passo 01 | IA atacou o Nó 08 | Recompensa: 100.00
-
-======================================================
- RELATÓRIO FINAL DA INJEÇÃO DE FALHAS
-======================================================
-Status: [SUCESSO DO ATAQUE]
-Total de Ataques Necessários : 1
-Propriedade Violada          : Safety (Atraso médio aumentou 50%+. Original: 90.86ms | Atual: 236.05ms)
-Recompensa Acumulada         : 100.00
-======================================================
-```
+| Property | Mathematical Metric | Physical NS-3 Metric | Critical Violation |
+| :--- | :--- | :--- | :--- |
+| **Liveness** | `nx.is_connected(G)` | Packet Delivery Ratio (PDR) | Network partitions or PDR drops significantly. |
+| **Safety** | `nx.average_shortest_path_length` | End-to-End Delay | Delay increases by 50%+ compared to baseline. |
+| **Availability**| `nx.average_node_connectivity` | Throughput / Reachability | Extreme loss of structural redundancy. |

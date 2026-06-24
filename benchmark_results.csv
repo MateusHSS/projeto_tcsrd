@@ -1,0 +1,21 @@
+instance_id,mlp_steps,mlp_time_seconds,mlp_status,gat_steps,gat_time_seconds,gat_status,random_steps_avg,random_time_seconds_avg,random_status
+0,3,22.33013391494751,Safety (Atraso médio aumentou 50%+. Original: 134.04ms | Atual: 230.00ms),17,54.824944496154785,Safety (Atraso médio aumentou 50%+. Original: 134.04ms | Atual: 271.32ms),11.4,35.44896116256714,Safety (Atraso médio aumentou 50%+. Original: 134.04ms | Atual: 295.78ms)
+1,3,20.908761262893677,Safety (Atraso médio aumentou 50%+. Original: 122.28ms | Atual: 196.65ms),5,29.397533655166626,Safety (Atraso médio aumentou 50%+. Original: 122.28ms | Atual: 226.11ms),5.0,26.775927734375,Safety (Atraso médio aumentou 50%+. Original: 122.28ms | Atual: 244.46ms)
+2,35,127.21326899528503,Survival,35,113.46009683609009,Survival,30.6,113.89444518089294,Survival
+3,35,103.47152209281921,Survival,35,101.33625173568726,Survival,33.8,102.79095931053162,Survival
+4,35,107.62070775032043,Survival,35,109.13637256622314,Survival,33.4,107.47921681404114,Survival
+5,32,95.44329595565796,Safety (Atraso médio aumentou 50%+. Original: 130.15ms | Atual: 223.93ms),3,16.491711139678955,Safety (Atraso médio aumentou 50%+. Original: 130.15ms | Atual: 197.26ms),3.4,19.804210662841797,Safety (Atraso médio aumentou 50%+. Original: 130.15ms | Atual: 203.56ms)
+6,2,10.32936954498291,Safety (Atraso médio aumentou 50%+. Original: 117.23ms | Atual: 231.43ms),2,14.385596752166748,Safety (Atraso médio aumentou 50%+. Original: 117.23ms | Atual: 178.31ms),4.6,20.772536754608154,Safety (Atraso médio aumentou 50%+. Original: 117.23ms | Atual: 228.68ms)
+7,35,94.86413049697876,Survival,35,98.9248948097229,Survival,30.6,83.94464201927185,Survival
+8,35,76.46262979507446,Survival,29,68.44531893730164,Safety (Atraso médio aumentou 50%+. Original: 167.00ms | Atual: 478.88ms),24.6,59.929716157913205,Survival
+9,2,15.066684007644653,Safety (Atraso médio aumentou 50%+. Original: 144.00ms | Atual: 225.15ms),3,14.816242218017578,Safety (Atraso médio aumentou 50%+. Original: 144.00ms | Atual: 233.71ms),15.2,50.453596925735475,Safety (Atraso médio aumentou 50%+. Original: 144.00ms | Atual: 226.57ms)
+10,21,60.94557571411133,Safety (Atraso médio aumentou 50%+. Original: 163.23ms | Atual: 304.52ms),10,36.80280041694641,Safety (Atraso médio aumentou 50%+. Original: 163.23ms | Atual: 284.86ms),25.8,65.22521162033081,Safety (Atraso médio aumentou 50%+. Original: 163.23ms | Atual: 249.91ms)
+11,24,60.54520297050476,Safety (Atraso médio aumentou 50%+. Original: 223.46ms | Atual: 346.16ms),35,75.38225388526917,Survival,28.6,60.45668497085571,Survival
+12,35,103.553884267807,Survival,35,112.33252811431885,Survival,35.0,106.75152792930604,Survival
+13,10,42.60633563995361,Safety (Atraso médio aumentou 50%+. Original: 153.19ms | Atual: 252.48ms),31,87.98213791847229,Safety (Atraso médio aumentou 50%+. Original: 153.19ms | Atual: 272.65ms),12.4,45.32791156768799,Safety (Atraso médio aumentou 50%+. Original: 153.19ms | Atual: 352.44ms)
+14,2,11.567983865737915,Safety (Atraso médio aumentou 50%+. Original: 140.67ms | Atual: 346.14ms),2,14.838963747024536,Safety (Atraso médio aumentou 50%+. Original: 140.67ms | Atual: 231.67ms),4.4,20.983034133911133,Safety (Atraso médio aumentou 50%+. Original: 140.67ms | Atual: 224.00ms)
+15,35,73.78177237510681,Survival,35,74.65815138816833,Survival,30.0,64.47817306518554,Survival
+16,5,19.50348401069641,Safety (Atraso médio aumentou 50%+. Original: 169.42ms | Atual: 273.74ms),5,19.3907732963562,Safety (Atraso médio aumentou 50%+. Original: 169.42ms | Atual: 282.56ms),15.2,45.736928367614745,Safety (Atraso médio aumentou 50%+. Original: 169.42ms | Atual: 268.82ms)
+17,27,76.26043343544006,Safety (Atraso médio aumentou 50%+. Original: 148.57ms | Atual: 229.24ms),4,22.41876745223999,Safety (Atraso médio aumentou 50%+. Original: 148.57ms | Atual: 232.36ms),15.0,50.36388459205627,Safety (Atraso médio aumentou 50%+. Original: 148.57ms | Atual: 224.51ms)
+18,2,12.988097190856934,Safety (Atraso médio aumentou 50%+. Original: 164.25ms | Atual: 280.10ms),17,64.27643179893494,Safety (Atraso médio aumentou 50%+. Original: 164.25ms | Atual: 260.36ms),12.8,49.19783296585083,Safety (Atraso médio aumentou 50%+. Original: 164.25ms | Atual: 287.16ms)
+19,35,87.4752733707428,Survival,35,91.86577939987183,Survival,32.2,83.14057350158691,Survival

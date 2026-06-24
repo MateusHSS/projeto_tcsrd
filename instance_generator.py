@@ -42,10 +42,6 @@ def generate_instances(
     if communication_radius is None:
         communication_radius = determine_communication_radius(num_nodes)
 
-    print(
-        f"Generating {num_instances} instances for {num_nodes}-node networks (Radius: {communication_radius})..."
-    )
-
     dir_name = os.path.dirname(os.path.abspath(csv_path))
     if dir_name:
         os.makedirs(dir_name, exist_ok=True)
@@ -88,7 +84,7 @@ def generate_instances(
                     ]
                 )
 
-    print(f"[OK] {num_instances} instances successfully saved to '{csv_path}'!")
+    print(f"[OK]!")
 
 
 if __name__ == "__main__":

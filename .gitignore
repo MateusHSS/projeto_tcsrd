@@ -5,10 +5,10 @@ __pycache__/
 *.zip
 *.pth
 
-# MAS abre uma exceção APENAS para o seu modelo oficial validado
-!modelos_pre_treinados/baseline_ppo_mlp.zip
 !modelos_pre_treinados/escala_50_ppo_mlp.zip
+!modelos_pre_treinados/escala_50_ppo_mlp_ns3.zip
 !modelos_pre_treinados/escala_50_ppo_gat.zip
+!modelos_pre_treinados/escala_50_ppo_gat_ns3.zip
 
 ppo_mesh_tensorboard/
 ppo_mesh_tensorboard_v2/

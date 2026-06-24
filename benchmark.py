@@ -11,11 +11,13 @@ import pandas as pd
 # Compatibilidade reversa para carregar modelos GAT salvos com nomes antigos de módulos/classes
 try:
     import gat_extractor
-
     sys.modules["extrator_gat"] = gat_extractor
-    gat_extractor.ExtratorFeaturesGAT = gat_extractor.GATFeaturesExtractor
+    if hasattr(gat_extractor, "ExtratorFeaturesGAT"):
+        gat_extractor.GATFeaturesExtractor = gat_extractor.ExtratorFeaturesGAT
+    elif hasattr(gat_extractor, "GATFeaturesExtractor"):
+        gat_extractor.ExtratorFeaturesGAT = gat_extractor.GATFeaturesExtractor
     GAT_AVAILABLE = True
-except ImportError:
+except (ImportError, AttributeError):
     GAT_AVAILABLE = False
 
 from stable_baselines3 import PPO
@@ -23,46 +25,49 @@ from mesh_environment import FaultInjectionEnvironment, load_env
 
 
 def predict_action_any_size(model, obs, env):
-    """Prediz a ação do modelo lidando com diferenças de tamanho de observação e ação.
-
+    """Prediz a ação do modelo garantindo que ele não entre em loop atacando nós mortos.
+    
     Adiciona preenchimento (padding) ou truncamento se o número de nós do modelo
     for diferente do número de nós do ambiente.
     """
     model_obs_len = model.observation_space.shape[0]
     env_obs_len = obs.shape[0]
 
+    # Prepara a observação correta para a rede neural
     if env_obs_len == model_obs_len:
-        action, _ = model.predict(obs, deterministic=True)
-        return int(action)
-
+        input_obs = obs
     elif env_obs_len < model_obs_len:
-        # O modelo espera mais nós do que o ambiente possui. Fazemos preenchimento (padding) com zeros.
-        padded_obs = np.zeros(model_obs_len, dtype=np.float32)
-        padded_obs[:env_obs_len] = obs
-        action, _ = model.predict(padded_obs, deterministic=True)
-        action = int(action)
+        input_obs = np.zeros(model_obs_len, dtype=np.float32)
+        input_obs[:env_obs_len] = obs
+    else:
+        input_obs = obs[:model_obs_len]
 
-        # Se a ação predita for um nó fictício (fora do limite do ambiente), escolhemos um nó vivo aleatório
-        if action >= env.num_nodes:
-            alive_nodes = [
-                n for n in range(env.num_nodes) if env.G.nodes[n]["status"] == 1.0
-            ]
-            if alive_nodes:
+    # Tenta prever a ação deterministicamente
+    action, _ = model.predict(input_obs, deterministic=True)
+    action = int(action)
+
+    # Ajusta limites do ambiente
+    if action >= env.num_nodes:
+        action = action % env.num_nodes
+
+    # ACTION MASKING: Se a IA tentou atacar um nó que JÁ ESTÁ MORTO (loop infinito)
+    if env.G.nodes[action]["status"] == 0.0:
+        # Pega a lista de todos os nós que ainda estão vivos
+        alive_nodes = [n for n in range(env.num_nodes) if env.G.nodes[n]["status"] == 1.0]
+        if alive_nodes:
+            # Pede para a IA escolher de forma probabilística (exploração) em vez de determinística fixa
+            action_stochastic, _ = model.predict(input_obs, deterministic=False)
+            action_stochastic = int(action_stochastic) % env.num_nodes
+            
+            # Se a IA estocástica também cair num nó morto, força um nó vivo aleatório da vizinhança
+            if env.G.nodes[action_stochastic]["status"] == 0.0:
                 action = int(np.random.choice(alive_nodes))
             else:
-                action = 0
-        return action
+                action = action_stochastic
+        else:
+            action = 0
 
-    else:
-        # O ambiente tem mais nós do que o modelo suporta. Truncamos a observação.
-        truncated_obs = obs[:model_obs_len]
-        action, _ = model.predict(truncated_obs, deterministic=True)
-        action = int(action)
-
-        # Ajusta a ação caso ela ultrapasse o limite do ambiente
-        if action >= env.num_nodes:
-            action = action % env.num_nodes
-        return action
+    return action
 
 
 def run_agent_episode(env, model, inst_id):
@@ -206,9 +211,7 @@ def main():
     else:
         NS3_PATH = NS3_PATH or "/home/user/ns-3.48"
 
-    print("======================================================")
     print(f" INICIANDO BENCHMARK DE FALHAS (Modo NS-3: {USE_NS3})")
-    print("======================================================")
     print(
         f"Rede: {args.num_nodes} nós | Instâncias: {args.instances} | Seed: {args.seed}"
     )
@@ -236,17 +239,17 @@ def main():
     )
     try:
         mlp_model = PPO.load(mlp_model_path)
-        print(f"[OK] Modelo MLP carregado com sucesso a partir de '{mlp_model_path}'.")
+        print(f"[OK] Modelo MLP carregado com sucesso.")
     except Exception as e_mlp_scale:
         print(
-            f"[Aviso] Modelo MLP de escala 50 não pôde ser carregado de '{mlp_model_path}': {e_mlp_scale}"
+            f"[Aviso] Modelo MLP não pode ser carregado"
         )
         print("Tentando carregar modelo baseline_ppo_mlp...")
         try:
             mlp_model = PPO.load("modelos_pre_treinados/baseline_ppo_mlp.zip")
-            print("[OK] Modelo MLP baseline (20 nós) carregado com sucesso.")
+            print("[OK] Modelo MLP baseline carregado com sucesso.")
         except Exception as e_mlp_base:
-            print(f"[Erro] Modelo MLP baseline não pôde ser carregado: {e_mlp_base}")
+            print(f"[Erro] Modelo MLP não pode ser carregado")
 
     # Carrega o modelo GAT de forma resiliente
     gat_model = None
@@ -259,11 +262,11 @@ def main():
         try:
             gat_model = PPO.load(gat_model_path)
             print(
-                f"[OK] Modelo GAT carregado com sucesso a partir de '{gat_model_path}'."
+                f"[OK] Modelo GAT carregado com sucesso."
             )
         except Exception as e:
             print(
-                f"[Aviso] Modelo GAT não pôde ser carregado de '{gat_model_path}': {e}"
+                f"[Aviso] Modelo GAT não pode ser carregado"
             )
     else:
         print(
@@ -347,9 +350,7 @@ def main():
     rand_steps_mean = df["random_steps_avg"].mean()
     rand_time_mean = df["random_time_seconds_avg"].mean()
 
-    print("\n======================================================")
     print(" RELATÓRIO FINAL DO BENCHMARK (MÉDIAS)")
-    print("======================================================")
     if mlp_model is not None:
         print(f"Média Passos - MLP    : {mlp_steps_mean:.2f}")
     if gat_model is not None:
@@ -361,8 +362,7 @@ def main():
     if gat_model is not None:
         print(f"Média Tempo  - GAT    : {gat_time_mean:.3f}s")
     print(f"Média Tempo  - Random : {rand_time_mean:.3f}s")
-    print("======================================================")
-    print(f"Resultados detalhados salvos em '{args.output}'")
+    print(f"Resultados salvos: '{args.output}'")
 
 
 if __name__ == "__main__":

@@ -222,7 +222,7 @@ class FaultInjectionEnvironment(gym.Env):
                 capture_output=True,
                 text=True,
                 check=True,
-                timeout=60.0,
+                timeout=300.0,
             )
 
             linhas = resultado.stdout.strip().split("\n")
@@ -379,13 +379,7 @@ class FaultInjectionEnvironment(gym.Env):
                 )
 
             else:
-                aumento_delay = delay_atual - self.original_delay
-                aumento_delay_ms = aumento_delay * 1000.0
-                perda_pdr = self.original_pdr - pdr_atual
-
-                recompensa = (
-                    (aumento_delay_ms * 5.0) + ((perda_pdr / 100.0) * 10.0) - 1.0
-                )
+                recompensa = -2.0
                 info["propriedade_violada"] = "Nenhuma (Ataque em andamento)"
         else:
             arestas_para_remover = list(self.G.edges(action))
@@ -417,12 +411,7 @@ class FaultInjectionEnvironment(gym.Env):
                         f"Safety (Latência aumentou 50%+. Original: {self.original_latency:.2f} | Atual: {latencia_atual:.2f})"
                     )
                 else:
-                    aumento_latencia = latencia_atual - self.original_latency
-                    perda_redundancia = self.original_redundancy - redundancia_atual
-
-                    recompensa = (
-                        (aumento_latencia * 5.0) + (perda_redundancia * 2.0) - 1.0
-                    )
+                    recompensa = -2.0
                     info["propriedade_violada"] = "Nenhuma (Ataque em andamento)"
 
         return self._get_observation(), recompensa, terminou, truncou, info
