@@ -38,6 +38,8 @@ Unlike traditional approaches that only check if the network partitioned, this e
 ├── mesh_simulation.cc       # Physical C++ simulation script for NS-3
 ├── train_ppo.py             # Training and fine-tuning script using MLP policies
 ├── train_ppo_gat.py         # Training and fine-tuning script using GAT policies
+├── train_mlp_pipeline.sh    # Bash pipeline script for MLP training (NetworkX -> NS-3)
+├── train_gat_pipeline.sh    # Bash pipeline script for GAT training (NetworkX -> NS-3)
 ├── validate_agent.py        # Validation script to load trained agents and run tests
 ├── instances/               # Folder containing generated network topologies (CSV)
 │   ├── train_50.csv              # Fixed training topology instances (50 nodes)
@@ -109,6 +111,13 @@ To automate training using physical simulator (NS-3), pass the `--use_ns3` flag:
 ```bash
 python train_ppo.py --use_ns3
 python train_ppo_gat.py --use_ns3
+```
+
+Alternatively, you can run the automated pipeline scripts to execute the two stages sequentially (NetworkX training followed by NS-3 transfer learning/fine-tuning):
+
+```bash
+./train_mlp_pipeline.sh
+./train_gat_pipeline.sh
 ```
 
 The resulting model is automatically saved to the `modelos_pre_treinados/` directory.
