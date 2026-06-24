@@ -41,11 +41,9 @@ Unlike traditional approaches that only check if the network partitioned, this e
 ├── validate_agent.py        # Validation script to load trained agents and run tests
 ├── instances/               # Folder containing generated network topologies (CSV)
 │   ├── train_50.csv              # Fixed training topology instances (50 nodes)
-│   ├── val_20.csv                # Fixed validation topology instances (20 nodes)
 │   └── benchmark_50.csv          # Benchmark topology instances (50 nodes)
 ├── benchmark_results.csv    # Detailed benchmark outputs
 ├── modelos_pre_treinados/   # Directory containing pre-trained model checkpoints
-│   ├── baseline_ppo_mlp.zip      # MLP policy trained on NetworkX
 │   ├── escala_50_ppo_mlp.zip     # MLP policy for 50-node scale
 │   └── escala_50_ppo_gat.zip     # GAT policy for 50-node scale
 └── README.md                # System documentation
@@ -53,14 +51,25 @@ Unlike traditional approaches that only check if the network partitioned, this e
 
 ---
 
-## Switching Between NetworkX and NS-3 (.env File)
+## Switching Between NetworkX and NS-3
 
-To toggle between fast mathematical simulation using NetworkX and real packet-level traffic simulation using NS-3, edit the variables in the `.env` file in the repository root:
+The framework supports switching between fast mathematical graph simulation (NetworkX) and high-fidelity packet-level traffic simulation (NS-3). 
 
-* USE_NS3: Set to True to enable NS-3 simulations, or False to use NetworkX.
-* NS3_PATH: Path to your local NS-3 installation directory (e.g., /home/username/ns-3.48).
+* **Simulator Path Configuration**: Configure `NS3_PATH` in the `.env` file at the repository root:
+  ```text
+  NS3_PATH=/home/username/ns-3.48
+  ```
+* **Training and Benchmarking Scripts**: The simulator choice is controlled directly via command-line flags/arguments (e.g., passing `--use_ns3`), allowing for seamless automation of training pipelines.
+* **Validation Script**: `validate_agent.py` reads `USE_NS3` dynamically from the `.env` file to decide the simulation mode.
 
-All training and validation scripts read this configuration dynamically.
+---
+
+## Environment Customization Parameters
+
+The `FaultInjectionEnvironment` supports additional configuration parameters in its constructor to mitigate training vulnerabilities:
+
+* `include_topological_features` (default: False): Set to True to append Degree Centrality and Betweenness Centrality metrics to each node's state vector. This provides the MLP agent with explicit graph structure awareness.
+* `penalize_milking` (default: False): Set to True to apply a constant step penalty of -2.0 for intermediate attacks instead of cumulative degradation rewards. This forces the RL agent to find the quickest path to network failure, preventing milking behaviors (reward hacking).
 
 ---
 
@@ -82,29 +91,31 @@ To generate reproducible datasets of network configurations, run the generator s
 # Generate 100 training instances with 50 nodes
 python instance_generator.py --num_instances 100 --num_nodes 50 --output instances/train_50.csv --seed 42
 
-# Generate 20 validation instances with 20 nodes
-python instance_generator.py --num_instances 20 --num_nodes 20 --output instances/val_20.csv --seed 100
+# Generate 20 benchmark/validation instances with 50 nodes
+python instance_generator.py --num_instances 20 --num_nodes 50 --output instances/benchmark_50.csv --seed 100
 ```
 
 3. Training the Agent
 
-To start training the policy using the generated training dataset:
+To start training using the fast mathematical simulation (NetworkX):
 
 ```bash
 python train_ppo.py
-```
-
-Or for GAT training:
-
-```bash
 python train_ppo_gat.py
 ```
 
-The resulting model is automatically saved to the modelos_pre_treinados/ directory.
+To automate training using physical simulator (NS-3), pass the `--use_ns3` flag:
+
+```bash
+python train_ppo.py --use_ns3
+python train_ppo_gat.py --use_ns3
+```
+
+The resulting model is automatically saved to the `modelos_pre_treinados/` directory.
 
 4. Validation
 
-To run validation on a fixed network configuration from the generated validation dataset (using a specific instance ID like 0 for reproducibility):
+To run validation on a fixed network configuration using the 50-node benchmark dataset (using a specific instance ID like 0 for reproducibility):
 
 ```bash
 python validate_agent.py
@@ -123,37 +134,10 @@ python benchmark.py --num_nodes 50 --instances instances/benchmark_50.csv --use_
 ```
 
 The options available are:
-* --num_nodes: Number of nodes in the network topology (default is 50).
-* --instances: Path to the topology CSV file.
-* --use_ns3: Override the USE_NS3 configuration from the .env file.
-* --runs_random: Number of runs for the random baseline to average results (default is 5).
-* --output: Path to the output CSV file to write results (default is ./benchmark_results.csv).
-* --seed: Random seed for reproducibility (default is 42).
+* `--num_nodes`: Number of nodes in the network topology (default is 50).
+* `--instances`: Path to the topology CSV file.
+* `--use_ns3`: Override the USE_NS3 configuration from the `.env` file (accepts `True` or `False`).
+* `--runs_random`: Number of runs for the random baseline to average results (default is 30).
+* `--output`: Path to the output CSV file to write results (default is `./benchmark_results.csv`).
+* `--seed`: Random seed for reproducibility (default is 42).
 
----
-
-## Validation Output Example
-
-When running the validation script, the step-by-step attack decisions are displayed:
-
-```text
-======================================================
- CARREGANDO A IA TREINADA (Modo NS-3: True)
-======================================================
-[Aviso] Modelo modelos_pre_treinados/escala_50_ppo_mlp_ns3 não encontrado. Tentando baseline_ppo_mlp...
-[OK] Modelo carregado com sucesso!
-
-======================================================
- INICIANDO O ATAQUE GUIADO PELA IA
-======================================================
-Passo 01 | IA atacou o Nó 08 | Recompensa: 100.00
-
-======================================================
- RELATÓRIO FINAL DA INJEÇÃO DE FALHAS
-======================================================
-Status: [SUCESSO DO ATAQUE]
-Total de Ataques Necessários : 1
-Propriedade Violada          : Safety (Atraso médio aumentou 50%+. Original: 90.86ms | Atual: 236.05ms)
-Recompensa Acumulada         : 100.00
-======================================================
-```

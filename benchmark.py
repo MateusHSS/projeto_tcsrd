@@ -13,9 +13,12 @@ try:
     import gat_extractor
 
     sys.modules["extrator_gat"] = gat_extractor
-    gat_extractor.ExtratorFeaturesGAT = gat_extractor.GATFeaturesExtractor
+    if hasattr(gat_extractor, "ExtratorFeaturesGAT"):
+        gat_extractor.GATFeaturesExtractor = gat_extractor.ExtratorFeaturesGAT
+    elif hasattr(gat_extractor, "GATFeaturesExtractor"):
+        gat_extractor.ExtratorFeaturesGAT = gat_extractor.GATFeaturesExtractor
     GAT_AVAILABLE = True
-except ImportError:
+except (ImportError, AttributeError):
     GAT_AVAILABLE = False
 
 from stable_baselines3 import PPO
@@ -168,7 +171,7 @@ def main():
     parser.add_argument(
         "--runs_random",
         type=int,
-        default=5,
+        default=10,
         help="Number of runs for the random baseline to average results.",
     )
     parser.add_argument(
@@ -179,6 +182,16 @@ def main():
     )
     parser.add_argument(
         "--seed", type=int, default=42, help="Random seed for reproducibility."
+    )
+    parser.add_argument(
+        "--include_topological_features",
+        action="store_true",
+        help="Include Degree and Betweenness centralities in environment observation.",
+    )
+    parser.add_argument(
+        "--penalize_milking",
+        action="store_true",
+        help="Apply step penalty of -2.0 to avoid milking behavior.",
     )
     args = parser.parse_args()
 
@@ -206,11 +219,9 @@ def main():
     else:
         NS3_PATH = NS3_PATH or "/home/user/ns-3.48"
 
-    print("======================================================")
-    print(f" INICIANDO BENCHMARK DE FALHAS (Modo NS-3: {USE_NS3})")
-    print("======================================================")
+    print(f"Starting Failure Benchmark (NS-3: {USE_NS3})")
     print(
-        f"Rede: {args.num_nodes} nós | Instâncias: {args.instances} | Seed: {args.seed}"
+        f"Network: {args.num_nodes} nodes | Instances: {args.instances} | Seed: {args.seed}"
     )
 
     env = FaultInjectionEnvironment(
@@ -218,6 +229,8 @@ def main():
         use_ns3=USE_NS3,
         ns3_path=NS3_PATH,
         instances_path=args.instances,
+        include_topological_features=args.include_topological_features,
+        penalize_milking=args.penalize_milking,
     )
 
     if not env.instances:
@@ -225,7 +238,7 @@ def main():
             "O arquivo de instâncias está vazio ou não pôde ser carregado."
         )
     instance_ids = sorted(list(env.instances.keys()))
-    print(f"Total de instâncias encontradas: {len(instance_ids)}")
+    print(f"Found {len(instance_ids)} instances.")
 
     # Carrega o modelo MLP de forma resiliente
     mlp_model = None
@@ -235,18 +248,12 @@ def main():
         else "modelos_pre_treinados/escala_50_ppo_mlp"
     )
     try:
-        mlp_model = PPO.load(mlp_model_path)
-        print(f"[OK] Modelo MLP carregado com sucesso a partir de '{mlp_model_path}'.")
+        mlp_model = PPO.load(mlp_model_path, device="cpu")
+        print(f"[OK] Loaded MLP model: '{mlp_model_path}'")
     except Exception as e_mlp_scale:
-        print(
-            f"[Aviso] Modelo MLP de escala 50 não pôde ser carregado de '{mlp_model_path}': {e_mlp_scale}"
+        raise FileNotFoundError(
+            f"Could not load MLP model from '{mlp_model_path}': {e_mlp_scale}"
         )
-        print("Tentando carregar modelo baseline_ppo_mlp...")
-        try:
-            mlp_model = PPO.load("modelos_pre_treinados/baseline_ppo_mlp.zip")
-            print("[OK] Modelo MLP baseline (20 nós) carregado com sucesso.")
-        except Exception as e_mlp_base:
-            print(f"[Erro] Modelo MLP baseline não pôde ser carregado: {e_mlp_base}")
 
     # Carrega o modelo GAT de forma resiliente
     gat_model = None
@@ -257,23 +264,17 @@ def main():
     )
     if GAT_AVAILABLE:
         try:
-            gat_model = PPO.load(gat_model_path)
-            print(
-                f"[OK] Modelo GAT carregado com sucesso a partir de '{gat_model_path}'."
-            )
+            gat_model = PPO.load(gat_model_path, device="cpu")
+            print(f"[OK] Loaded GAT model: '{gat_model_path}'")
         except Exception as e:
-            print(
-                f"[Aviso] Modelo GAT não pôde ser carregado de '{gat_model_path}': {e}"
-            )
+            print(f"[Warning] Could not load GAT from '{gat_model_path}': {e}")
     else:
-        print(
-            "[Aviso] GAT desabilitado devido a dependências em falta (PyTorch Geometric)."
-        )
+        print("[Warning] GAT disabled (missing PyTorch Geometric).")
 
     results = []
 
     for inst_id in instance_ids:
-        print(f"\nAvaliando Instância {inst_id}...")
+        print(f"\nEvaluating Instance {inst_id}...")
 
         mlp_steps, mlp_time, mlp_reason, mlp_success = np.nan, np.nan, "N/A", False
         if mlp_model is not None:
@@ -282,10 +283,10 @@ def main():
                     env, mlp_model, inst_id
                 )
                 print(
-                    f"  MLP Agent  -> Passos: {mlp_steps:02d} | Tempo: {mlp_time:6.3f}s | Status: {mlp_reason}"
+                    f"  MLP Agent  -> Steps: {mlp_steps:02d} | Time: {mlp_time:6.3f}s | Status: {mlp_reason}"
                 )
             except Exception as e:
-                print(f"  MLP Agent  -> Erro na execução: {e}")
+                print(f"  MLP Agent  -> Error: {e}")
 
         gat_steps, gat_time, gat_reason, gat_success = np.nan, np.nan, "N/A", False
         if gat_model is not None:
@@ -294,10 +295,10 @@ def main():
                     env, gat_model, inst_id
                 )
                 print(
-                    f"  GAT Agent  -> Passos: {gat_steps:02d} | Tempo: {gat_time:6.3f}s | Status: {gat_reason}"
+                    f"  GAT Agent  -> Steps: {gat_steps:02d} | Time: {gat_time:6.3f}s | Status: {gat_reason}"
                 )
             except Exception as e:
-                print(f"  GAT Agent  -> Erro na execução: {e}")
+                print(f"  GAT Agent  -> Error: {e}")
 
         rand_steps_list = []
         rand_time_list = []
@@ -313,7 +314,7 @@ def main():
         avg_rand_time = float(np.mean(rand_time_list))
         most_common_reason = max(set(rand_reasons), key=rand_reasons.count)
         print(
-            f"  Random (x{args.runs_random}) -> Passos (Média): {avg_rand_steps:5.1f} | Tempo: {avg_rand_time:6.3f}s | Status: {most_common_reason}"
+            f"  Random (x{args.runs_random}) -> Steps (avg): {avg_rand_steps:5.1f} | Time: {avg_rand_time:6.3f}s | Status: {most_common_reason}"
         )
 
         results.append(
@@ -347,22 +348,20 @@ def main():
     rand_steps_mean = df["random_steps_avg"].mean()
     rand_time_mean = df["random_time_seconds_avg"].mean()
 
-    print("\n======================================================")
-    print(" RELATÓRIO FINAL DO BENCHMARK (MÉDIAS)")
-    print("======================================================")
+    print("\n=== FINAL BENCHMARK REPORT (MEANS) ===")
     if mlp_model is not None:
-        print(f"Média Passos - MLP    : {mlp_steps_mean:.2f}")
+        print(f"Avg Steps - MLP    : {mlp_steps_mean:.2f}")
     if gat_model is not None:
-        print(f"Média Passos - GAT    : {gat_steps_mean:.2f}")
-    print(f"Média Passos - Random : {rand_steps_mean:.2f}")
-    print("------------------------------------------------------")
+        print(f"Avg Steps - GAT    : {gat_steps_mean:.2f}")
+    print(f"Avg Steps - Random : {rand_steps_mean:.2f}")
+    print("--------------------------------------")
     if mlp_model is not None:
-        print(f"Média Tempo  - MLP    : {mlp_time_mean:.3f}s")
+        print(f"Avg Time  - MLP    : {mlp_time_mean:.3f}s")
     if gat_model is not None:
-        print(f"Média Tempo  - GAT    : {gat_time_mean:.3f}s")
-    print(f"Média Tempo  - Random : {rand_time_mean:.3f}s")
-    print("======================================================")
-    print(f"Resultados detalhados salvos em '{args.output}'")
+        print(f"Avg Time  - GAT    : {gat_time_mean:.3f}s")
+    print(f"Avg Time  - Random : {rand_time_mean:.3f}s")
+    print("======================================")
+    print(f"Results saved to '{args.output}'")
 
 
 if __name__ == "__main__":

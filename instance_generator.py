@@ -88,7 +88,7 @@ def generate_instances(
                     ]
                 )
 
-    print(f"[OK] {num_instances} instances successfully saved to '{csv_path}'!")
+    print(f"[OK] {num_instances} instances successfully saved to '{csv_path}'")
 
 
 if __name__ == "__main__":

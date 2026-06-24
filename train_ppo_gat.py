@@ -1,6 +1,7 @@
 """Script para treinamento e ajuste fino de uma política PPO GAT no ambiente de injeção de falhas."""
 
 import os
+import argparse
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import SubprocVecEnv
@@ -10,8 +11,16 @@ from gat_extractor import GATFeaturesExtractor
 
 def main():
     """Função principal para executar o fluxo de treinamento PPO GAT."""
+    parser = argparse.ArgumentParser(description="Treinamento PPO GAT.")
+    parser.add_argument(
+        "--use_ns3",
+        action="store_true",
+        help="Use NS-3 physical simulator instead of NetworkX.",
+    )
+    args = parser.parse_args()
+    USE_NS3 = args.use_ns3
+
     env_config = load_env()
-    USE_NS3 = env_config.get("USE_NS3", "False").lower() in ("true", "1", "yes")
     NS3_PATH = env_config.get("NS3_PATH")
 
     if USE_NS3:
@@ -27,11 +36,9 @@ def main():
         NS3_PATH = NS3_PATH or "/home/user/ns-3.48"
 
     NUM_NODES = 50
-    TOTAL_STEPS = 5000 if USE_NS3 else 200000
+    TOTAL_STEPS = 2500 if USE_NS3 else 150000
 
-    print(
-        f"1. Instanciando os Ambientes Paralelos de Treinamento (Modo NS-3: {USE_NS3})..."
-    )
+    print(f"Inicializando envs paralelos (Modo NS-3: {USE_NS3})...")
     num_envs = 2 if USE_NS3 else 4
     instances_path = "instances/train_50.csv"
 
@@ -41,12 +48,14 @@ def main():
             use_ns3=USE_NS3,
             ns3_path=NS3_PATH,
             instances_path=instances_path,
+            include_topological_features=False,
+            penalize_milking=True,
         ),
         n_envs=num_envs,
         vec_env_cls=SubprocVecEnv,
     )
 
-    print("2. Configurando a Arquitetura Híbrida (GAT + PPO)...")
+    print("Configurando GAT + PPO...")
     policy_kwargs = dict(
         features_extractor_class=GATFeaturesExtractor,
         features_extractor_kwargs=dict(features_dim=256, num_nodes=NUM_NODES),
@@ -56,11 +65,12 @@ def main():
 
     if USE_NS3 and os.path.exists(baseline_path):
         print(
-            f"2. [Transfer Learning] Carregando cérebro GAT pré-treinado no NetworkX para calibrar no NS-3: {baseline_path}"
+            f"Transfer Learning: Carregando modelo do NetworkX para fine-tuning no NS-3: {baseline_path}"
         )
         ppo_gat_model = PPO.load(
             baseline_path,
             env=env,
+            device="cpu",
             learning_rate=0.0001,
             tensorboard_log="./escala_50_ppo_gat_ns3/",
         )
@@ -70,21 +80,21 @@ def main():
             env,
             policy_kwargs=policy_kwargs,
             verbose=1,
-            learning_rate=0.0003,
-            n_steps=1024,
-            ent_coef=0.01,
+            learning_rate=4.446778882320581e-05,
+            n_steps=2048,
+            ent_coef=0.008362026818168191,
+            gamma=0.95,
+            clip_range=0.2,
             tensorboard_log=(
                 "./escala_50_ppo_gat_ns3/" if USE_NS3 else "./escala_50_ppo_gat/"
             ),
             device="cpu",
         )
 
-    print(
-        f"3. Iniciando o Treinamento Baseado em Atenção Estrutural ({TOTAL_STEPS} passos)..."
-    )
+    print(f"Iniciando treinamento ({TOTAL_STEPS} passos)...")
     ppo_gat_model.learn(total_timesteps=TOTAL_STEPS, progress_bar=True)
 
-    print("4. Treinamento Concluído! Salvando o Framework Proposto...")
+    print("Treinamento concluído! Salvando modelo...")
 
     save_name = (
         "modelos_pre_treinados/escala_50_ppo_gat_ns3"
@@ -93,7 +103,7 @@ def main():
     )
     ppo_gat_model.save(save_name)
 
-    print(f"[OK] Modelo definitivo salvo com sucesso em '{save_name}.zip'")
+    print(f"[OK] Modelo salvo em '{save_name}.zip'")
 
 
 if __name__ == "__main__":

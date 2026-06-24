@@ -2,6 +2,7 @@
 
 import os
 import gymnasium as gym
+import argparse
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import SubprocVecEnv
@@ -10,8 +11,16 @@ from mesh_environment import FaultInjectionEnvironment, load_env
 
 def main():
     """Função principal para executar o fluxo de treinamento PPO MLP."""
+    parser = argparse.ArgumentParser(description="Treinamento PPO MLP.")
+    parser.add_argument(
+        "--use_ns3",
+        action="store_true",
+        help="Use NS-3 physical simulator instead of NetworkX.",
+    )
+    args = parser.parse_args()
+    USE_NS3 = args.use_ns3
+
     env_config = load_env()
-    USE_NS3 = env_config.get("USE_NS3", "False").lower() in ("true", "1", "yes")
     NS3_PATH = env_config.get("NS3_PATH")
 
     if USE_NS3:
@@ -27,9 +36,9 @@ def main():
         NS3_PATH = NS3_PATH or "/home/user/ns-3.48"
 
     NUM_NODES = 50
-    TOTAL_STEPS = 5000 if USE_NS3 else 200000
+    TOTAL_STEPS = 2500 if USE_NS3 else 150000
 
-    print(f"1. Instanciando os Ambientes Paralelos (Modo NS-3: {USE_NS3})...")
+    print(f"Inicializando envs paralelos (Modo NS-3: {USE_NS3})...")
 
     num_envs = 2 if USE_NS3 else 4
     instances_path = "instances/train_50.csv"
@@ -40,6 +49,10 @@ def main():
             use_ns3=USE_NS3,
             ns3_path=NS3_PATH,
             instances_path=instances_path,
+            include_topological_features=False,
+            penalize_milking=False,
+            # include_topological_features=True,
+            # penalize_milking=True,
         ),
         n_envs=num_envs,
         vec_env_cls=SubprocVecEnv,
@@ -49,16 +62,17 @@ def main():
 
     if USE_NS3 and os.path.exists(baseline_path):
         print(
-            f"2. [Transfer Learning] Carregando cérebro pré-treinado no NetworkX para calibrar no NS-3: {baseline_path}"
+            f"Transfer Learning: Carregando modelo do NetworkX para fine-tuning no NS-3: {baseline_path}"
         )
         ppo_model = PPO.load(
             baseline_path,
             env=env,
+            device="cpu",
             learning_rate=0.0001,
             tensorboard_log="./escala_50_ppo_mlp_ns3/",
         )
     else:
-        print("2. Criando o Agente PPO do zero (Baseline)...")
+        print("Criando PPO model do zero (Baseline)...")
         ppo_model = PPO(
             "MlpPolicy",
             env,
@@ -72,10 +86,10 @@ def main():
             device="cpu",
         )
 
-    print(f"3. Iniciando o Treinamento Profundo ({TOTAL_STEPS} passos)...")
+    print(f"Iniciando treinamento ({TOTAL_STEPS} passos)...")
     ppo_model.learn(total_timesteps=TOTAL_STEPS, progress_bar=True)
 
-    print("4. Treinamento Concluído!")
+    print("Treinamento concluído!")
 
     save_name = (
         "modelos_pre_treinados/escala_50_ppo_mlp_ns3"
@@ -83,7 +97,7 @@ def main():
         else "modelos_pre_treinados/escala_50_ppo_mlp"
     )
     ppo_model.save(save_name)
-    print(f"[OK] Modelo salvo com sucesso em '{save_name}.zip'")
+    print(f"[OK] Modelo salvo em '{save_name}.zip'")
 
 
 if __name__ == "__main__":

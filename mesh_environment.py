@@ -33,7 +33,7 @@ class FaultInjectionEnvironment(gym.Env):
     Suporta simulações via NetworkX ou físicas usando o simulador NS-3.
     """
 
-    def __init__(self, num_nodes=20, use_ns3=None, ns3_path=None, instances_path=None):
+    def __init__(self, num_nodes=20, use_ns3=None, ns3_path=None, instances_path=None, include_topological_features=False, penalize_milking=False):
         """Inicializa o ambiente de injeção de falhas.
 
         Args:
@@ -41,9 +41,13 @@ class FaultInjectionEnvironment(gym.Env):
             use_ns3 (bool, optional): Se True, utiliza o NS-3 para simulação de pacotes físicos.
             ns3_path (str, optional): Caminho do diretório de instalação do NS-3.
             instances_path (str, optional): Caminho do CSV de instâncias de rede pré-geradas.
+            include_topological_features (bool): Se True, adiciona centralidades no vetor de observações.
+            penalize_milking (bool): Se True, penaliza cada passo para evitar o comportamento de ordenha.
         """
         super(FaultInjectionEnvironment, self).__init__()
         self.num_nodes = num_nodes
+        self.include_topological_features = include_topological_features
+        self.penalize_milking = penalize_milking
 
         env_config = load_env()
 
@@ -88,8 +92,12 @@ class FaultInjectionEnvironment(gym.Env):
             self._copy_simulation_script()
 
         self.action_space = gym.spaces.Discrete(self.num_nodes)
+        num_features = 5 if self.include_topological_features else 3
         self.observation_space = gym.spaces.Box(
-            low=0.0, high=1.0, shape=(self.num_nodes * 3,), dtype=np.float32
+            low=0.0,
+            high=1.0,
+            shape=(self.num_nodes * num_features,),
+            dtype=np.float32
         )
 
         self.graph_ptr = None
@@ -171,11 +179,11 @@ class FaultInjectionEnvironment(gym.Env):
             if not os.path.exists(dest_cc) or os.path.getmtime(
                 src_cc
             ) > os.path.getmtime(dest_cc):
-                print(f"[NS3-Bridge] Copiando {src_cc} para {dest_cc}...")
+                print(f"[NS3] Syncing {os.path.basename(src_cc)} to scratch...")
                 os.makedirs(os.path.dirname(dest_cc), exist_ok=True)
                 shutil.copy(src_cc, dest_cc)
         else:
-            print(f"[NS3-Bridge] Aviso: {src_cc} não encontrado localmente no projeto.")
+            print(f"[NS3] Warning: {os.path.basename(src_cc)} not found.")
 
     def _run_ns3_simulation(self):
         """Executa o simulador NS-3 em subprocesso e retorna as métricas coletadas.
@@ -240,12 +248,10 @@ class FaultInjectionEnvironment(gym.Env):
             return json.loads(json_str)
 
         except subprocess.TimeoutExpired as e:
-            print(
-                f"[NS3-Bridge] Tempo limite atingido (timeout) ao executar o simulador NS-3: {e}"
-            )
+            print(f"[NS3] Timeout running simulator: {e}")
             return {"pdr": 0.0, "avg_delay": 9.99, "tx_packets": 0, "rx_packets": 0}
         except (subprocess.CalledProcessError, ValueError) as e:
-            print(f"[NS3-Bridge] Falha na execução do simulador: {e}")
+            print(f"[NS3] Simulation failed: {e}")
             return {"pdr": 0.0, "avg_delay": 9.99, "tx_packets": 0, "rx_packets": 0}
 
     def reset(self, seed=None, options=None):
@@ -322,11 +328,30 @@ class FaultInjectionEnvironment(gym.Env):
         Returns:
             np.ndarray: Array contendo o status e métricas de todos os nós.
         """
-        obs = []
-        for i in range(self.num_nodes):
-            status = self.G.nodes[i]["status"]
-            cpu, mem = self.G.nodes[i]["features"]
-            obs.extend([status, cpu, mem])
+        if self.include_topological_features:
+            # Calcular centralidades no subgrafo de nós vivos
+            nos_vivos = [n for n in self.G.nodes() if self.G.nodes[n]["status"] == 1.0]
+            subgrafo = self.G.subgraph(nos_vivos)
+            
+            deg_cent = nx.degree_centrality(subgrafo)
+            try:
+                bet_cent = nx.betweenness_centrality(subgrafo)
+            except Exception:
+                bet_cent = {n: 0.0 for n in subgrafo.nodes()}
+            
+            obs = []
+            for i in range(self.num_nodes):
+                status = self.G.nodes[i]["status"]
+                cpu, mem = self.G.nodes[i]["features"]
+                d_cent = deg_cent.get(i, 0.0) if status == 1.0 else 0.0
+                b_cent = bet_cent.get(i, 0.0) if status == 1.0 else 0.0
+                obs.extend([status, cpu, mem, d_cent, b_cent])
+        else:
+            obs = []
+            for i in range(self.num_nodes):
+                status = self.G.nodes[i]["status"]
+                cpu, mem = self.G.nodes[i]["features"]
+                obs.extend([status, cpu, mem])
         return np.array(obs, dtype=np.float32)
 
     def step(self, action):
@@ -379,13 +404,15 @@ class FaultInjectionEnvironment(gym.Env):
                 )
 
             else:
-                aumento_delay = delay_atual - self.original_delay
-                aumento_delay_ms = aumento_delay * 1000.0
-                perda_pdr = self.original_pdr - pdr_atual
-
-                recompensa = (
-                    (aumento_delay_ms * 5.0) + ((perda_pdr / 100.0) * 10.0) - 1.0
-                )
+                if self.penalize_milking:
+                    recompensa = -2.0  # Penalidade constante por passo para forçar rapidez
+                else:
+                    aumento_delay = delay_atual - self.original_delay
+                    aumento_delay_ms = aumento_delay * 1000.0
+                    perda_pdr = self.original_pdr - pdr_atual
+                    recompensa = (
+                        (aumento_delay_ms * 5.0) + ((perda_pdr / 100.0) * 10.0) - 1.0
+                    )
                 info["propriedade_violada"] = "Nenhuma (Ataque em andamento)"
         else:
             arestas_para_remover = list(self.G.edges(action))
@@ -417,12 +444,14 @@ class FaultInjectionEnvironment(gym.Env):
                         f"Safety (Latência aumentou 50%+. Original: {self.original_latency:.2f} | Atual: {latencia_atual:.2f})"
                     )
                 else:
-                    aumento_latencia = latencia_atual - self.original_latency
-                    perda_redundancia = self.original_redundancy - redundancia_atual
-
-                    recompensa = (
-                        (aumento_latencia * 5.0) + (perda_redundancia * 2.0) - 1.0
-                    )
+                    if self.penalize_milking:
+                        recompensa = -2.0  # Penalidade constante por passo para forçar rapidez
+                    else:
+                        aumento_latencia = latencia_atual - self.original_latency
+                        perda_redundancia = self.original_redundancy - redundancia_atual
+                        recompensa = (
+                            (aumento_latencia * 5.0) + (perda_redundancia * 2.0) - 1.0
+                        )
                     info["propriedade_violada"] = "Nenhuma (Ataque em andamento)"
 
         return self._get_observation(), recompensa, terminou, truncou, info

@@ -6,7 +6,6 @@ __pycache__/
 *.pth
 
 # MAS abre uma exceção APENAS para o seu modelo oficial validado
-!modelos_pre_treinados/baseline_ppo_mlp.zip
 !modelos_pre_treinados/escala_50_ppo_mlp.zip
 !modelos_pre_treinados/escala_50_ppo_gat.zip
 

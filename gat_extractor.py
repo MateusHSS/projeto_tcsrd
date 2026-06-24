@@ -16,17 +16,24 @@ class ExtratorFeaturesGAT(BaseFeaturesExtractor):
         self,
         observation_space: gym.spaces.Box,
         features_dim: int = 256,
-        num_nos: int = 20,
+        num_nos: int = None,
+        num_nodes: int = None,
     ):
         """Initializes the GAT feature extractor.
 
         Args:
             observation_space (gym.spaces.Box): The observation space of the environment.
             features_dim (int): Dimension of the output features.
-            num_nos (int): Number of nodes in the network topology.
+            num_nos (int, optional): Number of nodes in the network topology (Portuguese nomenclature).
+            num_nodes (int, optional): Number of nodes in the network topology (English nomenclature).
         """
         super().__init__(observation_space, features_dim)
-        self.num_nos = num_nos
+        # Mapeia dinamicamente para suportar ambas as nomenclaturas
+        self.num_nos = (
+            num_nodes
+            if num_nodes is not None
+            else (num_nos if num_nos is not None else 20)
+        )
         self.num_features_no = 3
 
         self.gat1 = GATConv(
@@ -82,3 +89,6 @@ class ExtratorFeaturesGAT(BaseFeaturesExtractor):
         saida_ppo = self.fc_saida(h_achatado)
         return saida_ppo
 
+
+# Alias para compatibilidade com importações em inglês e retrocompatibilidade de checkpoints
+GATFeaturesExtractor = ExtratorFeaturesGAT

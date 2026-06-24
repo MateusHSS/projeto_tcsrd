@@ -23,13 +23,11 @@ def main():
     else:
         NS3_PATH = NS3_PATH or "/home/user/ns-3.48"
 
-    NUM_NODES = 20
+    NUM_NODES = 50
 
-    print("======================================================")
-    print(f" CARREGANDO A IA TREINADA (Modo NS-3: {USE_NS3})")
-    print("======================================================")
+    print(f"Loading trained model (NS-3: {USE_NS3})...")
 
-    instances_path = "instances/val_20.csv"
+    instances_path = "instances/benchmark_50.csv"
     env = FaultInjectionEnvironment(
         num_nodes=NUM_NODES,
         use_ns3=USE_NS3,
@@ -40,22 +38,19 @@ def main():
     model_path = (
         "modelos_pre_treinados/escala_50_ppo_mlp_ns3"
         if USE_NS3
-        else "modelos_pre_treinados/baseline_ppo_mlp"
+        else "modelos_pre_treinados/escala_50_ppo_mlp"
     )
 
     try:
-        model = PPO.load(model_path)
-    except Exception:
-        print(
-            f"[Aviso] Modelo {model_path} não encontrado. Tentando baseline_ppo_mlp..."
+        model = PPO.load(model_path, device="cpu")
+    except Exception as e:
+        raise FileNotFoundError(
+            f"Could not load PPO model from '{model_path}': {e}"
         )
-        model = PPO.load("modelos_pre_treinados/baseline_ppo_mlp.zip")
 
-    print("[OK] Modelo carregado com sucesso!\n")
+    print("[OK] Model loaded successfully.\n")
 
-    print("======================================================")
-    print(" INICIANDO O ATAQUE GUIADO PELA IA")
-    print("======================================================")
+    print("Starting guided attacks...")
 
     obs, _ = env.reset(options={"instancia_id": 0})
     episode_terminated = False
@@ -72,7 +67,7 @@ def main():
         total_reward += reward
 
         print(
-            f"Passo {step_count:02d} | IA atacou o Nó {action:02d} | Recompensa: {reward:6.2f}"
+            f"Step {step_count:02d} | Node {action:02d} attacked | Reward: {reward:6.2f}"
         )
 
         if terminated:
@@ -82,18 +77,15 @@ def main():
 
         episode_terminated = terminated or truncated
 
-    print("\n======================================================")
-    print(" RELATÓRIO FINAL DA INJEÇÃO DE FALHAS")
-    print("======================================================")
+    print("\n--- Final Fault Injection Report ---")
     if total_reward > 0:
-        print("Status: [SUCESSO DO ATAQUE]")
+        print("Status: [ATTACK SUCCESS]")
     else:
-        print("Status: [FALHA DO ATAQUE - RESILIÊNCIA COMPROVADA]")
+        print("Status: [ATTACK FAILED - RESILIENT NETWORK]")
 
-    print(f"Total de Ataques Necessários : {step_count}")
-    print(f"Propriedade Violada          : {failure_reason}")
-    print(f"Recompensa Acumulada         : {total_reward:.2f}")
-    print("======================================================")
+    print(f"Total steps taken  : {step_count}")
+    print(f"Property violated  : {failure_reason}")
+    print(f"Cumulative reward  : {total_reward:.2f}")
 
 
 if __name__ == "__main__":
